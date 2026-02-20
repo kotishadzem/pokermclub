@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Staff Users ──
+enum Role {
+  ADMIN
+  PITBOSS
+  CASHIER
+  DEALER
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String
+  role      Role
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tableSessions TableSession[] @relation("DealerSessions")
+  transactions  Transaction[]
+}
+
+// ── Players ──
+model PlayerStatus {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  players Player[]
+}
+
+model Player {
+  id              String        @id @default(cuid())
+  firstName       String
+  lastName        String
+  phone           String?
+  idNumber        String?       @unique
+  photo           String?
+  birthday        DateTime?
+  notes           String?
+  rakebackPercent Float         @default(0)
+  statusId        String?
+  status          PlayerStatus? @relation(fields: [statusId], references: [id])
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  transactions  Transaction[]
+  waitingList   WaitingList[]
+  tableSeats    TableSeat[]
+  rakeRecords   RakeRecord[]
+}
+
+// ── Game Configuration ──
+model GameType {
+  id          String  @id @default(cuid())
+  name        String  @unique
+  description String?
+
+  tables Table[]
+}
+
+// ── Tables ──
+enum TableStatus {
+  OPEN
+  CLOSED
+  RESERVED
+}
+
+model Table {
+  id         String      @id @default(cuid())
+  name       String      @unique
+  gameTypeId String?
+  gameType   GameType?   @relation(fields: [gameTypeId], references: [id])
+  seats      Int         @default(9)
+  minBuyIn   Float       @default(0)
+  maxBuyIn   Float       @default(0)
+  blindSmall Float       @default(0)
+  blindBig   Float       @default(0)
+  status     TableStatus @default(CLOSED)
+  posX       Float       @default(0)
+  posY       Float       @default(0)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  sessions    TableSession[]
+  waitingList WaitingList[]
+}
+
+// ── Table Sessions & Seats ──
+model TableSession {
+  id        String    @id @default(cuid())
+  tableId   String
+  table     Table     @relation(fields: [tableId], references: [id])
+  dealerId  String?
+  dealer    User?     @relation("DealerSessions", fields: [dealerId], references: [id])
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  seats       TableSeat[]
+  rakeRecords RakeRecord[]
+}
+
+model TableSeat {
+  id             String       @id @default(cuid())
+  tableSessionId String
+  tableSession   TableSession @relation(fields: [tableSessionId], references: [id])
+  playerId       String
+  player         Player       @relation(fields: [playerId], references: [id])
+  seatNumber     Int
+  buyInAmount    Float        @default(0)
+  joinedAt       DateTime     @default(now())
+  leftAt         DateTime?
+}
+
+// ── Waiting List ──
+model WaitingList {
+  id         String   @id @default(cuid())
+  playerId   String
+  player     Player   @relation(fields: [playerId], references: [id])
+  tableId    String?
+  table      Table?   @relation(fields: [tableId], references: [id])
+  position   Int
+  createdAt  DateTime @default(now())
+}
+
+// ── Transactions ──
+enum TransactionType {
+  BUY_IN
+  CASH_OUT
+  DEPOSIT
+  WITHDRAWAL
+  RAKEBACK_PAYOUT
+}
+
+model Transaction {
+  id        String          @id @default(cuid())
+  playerId  String
+  player    Player          @relation(fields: [playerId], references: [id])
+  type      TransactionType
+  amount    Float
+  notes     String?
+  userId    String
+  user      User            @relation(fields: [userId], references: [id])
+  createdAt DateTime        @default(now())
+}
+
+// ── Rake Tracking ──
+model RakeRecord {
+  id             String       @id @default(cuid())
+  tableSessionId String
+  tableSession   TableSession @relation(fields: [tableSessionId], references: [id])
+  playerId       String?
+  player         Player?      @relation(fields: [playerId], references: [id])
+  potAmount      Float
+  rakeAmount     Float
+  createdAt      DateTime     @default(now())
+}

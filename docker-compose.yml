@@ -1,0 +1,39 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3002:3000"
+    environment:
+      - DATABASE_URL=postgresql://poker:poker123@db:5432/pokerclub?schema=public
+      - NEXTAUTH_SECRET=dev-secret-key-poker-club-2024
+      - NEXTAUTH_URL=http://localhost:3002
+      - AUTH_TRUST_HOST=true
+      - NODE_ENV=development
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "npx prisma generate && npx prisma migrate deploy && npm run dev"
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: poker
+      POSTGRES_PASSWORD: poker123
+      POSTGRES_DB: pokerclub
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U poker -d pokerclub"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
