@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
   const { error } = await requireRole(["ADMIN", "PITBOSS", "DEALER"]);
   if (error) return error;
 
-  const { tableSessionId, potAmount, rakeAmount, playerId } = await req.json();
+  const { tableSessionId, potAmount, rakeAmount, tipAmount, playerId } = await req.json();
 
   if (!tableSessionId || potAmount === undefined || rakeAmount === undefined) {
     return NextResponse.json({ error: "tableSessionId, potAmount, and rakeAmount required" }, { status: 400 });
@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
       tableSessionId,
       potAmount,
       rakeAmount,
+      tipAmount: tipAmount || 0,
       playerId: playerId || null,
     },
   });
@@ -45,6 +46,7 @@ export async function GET(req: NextRequest) {
 
   const totalRake = records.reduce((sum, r) => sum + r.rakeAmount, 0);
   const totalPots = records.reduce((sum, r) => sum + r.potAmount, 0);
+  const totalTips = records.reduce((sum, r) => sum + r.tipAmount, 0);
 
-  return NextResponse.json({ records, totalRake, totalPots });
+  return NextResponse.json({ records, totalRake, totalPots, totalTips });
 }

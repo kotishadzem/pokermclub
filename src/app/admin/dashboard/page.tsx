@@ -18,6 +18,7 @@ interface DashboardStats {
   totalPlayers: number;
   openTables: number;
   todayRevenue: number;
+  todayTips: number;
   activeStaff: number;
   recentActivity: TxRecord[];
 }
@@ -66,6 +67,12 @@ export default function AdminDashboard() {
       accent: "var(--felt-green)",
     },
     {
+      label: "Today's Tips",
+      value: loading ? "..." : `$${(data?.todayTips ?? 0).toFixed(2)}`,
+      icon: "♥",
+      accent: "var(--felt-green-light)",
+    },
+    {
       label: "Staff Online",
       value: loading ? "..." : String(data?.activeStaff ?? 0),
       icon: "⦿",
@@ -89,7 +96,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         {stats.map((stat, i) => (
           <div
             key={stat.label}

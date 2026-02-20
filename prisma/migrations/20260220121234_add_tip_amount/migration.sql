@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "RakeRecord" ADD COLUMN     "tipAmount" DOUBLE PRECISION NOT NULL DEFAULT 0;

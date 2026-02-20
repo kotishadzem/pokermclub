@@ -18,7 +18,7 @@ export async function GET() {
       prisma.table.count({ where: { status: "OPEN" } }),
       prisma.rakeRecord.aggregate({
         where: { createdAt: { gte: dayStart, lte: dayEnd } },
-        _sum: { rakeAmount: true },
+        _sum: { rakeAmount: true, tipAmount: true },
       }),
       prisma.user.count({ where: { active: true } }),
       prisma.transaction.findMany({
@@ -35,6 +35,7 @@ export async function GET() {
     totalPlayers: playerCount,
     openTables: openTableCount,
     todayRevenue: todayRake._sum.rakeAmount || 0,
+    todayTips: todayRake._sum.tipAmount || 0,
     activeStaff: activeStaffCount,
     recentActivity,
   });

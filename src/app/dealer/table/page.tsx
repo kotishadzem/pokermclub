@@ -14,6 +14,7 @@ interface RakeEntry {
   id: string;
   potAmount: number;
   rakeAmount: number;
+  tipAmount: number;
   createdAt: string;
 }
 
@@ -50,6 +51,7 @@ export default function DealerTablePage() {
   const [loading, setLoading] = useState(true);
   const [potAmount, setPotAmount] = useState("");
   const [rakeAmount, setRakeAmount] = useState("");
+  const [tipAmount, setTipAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState("");
 
@@ -75,6 +77,7 @@ export default function DealerTablePage() {
         tableSessionId: data.tableSession.id,
         potAmount: parseFloat(potAmount),
         rakeAmount: parseFloat(rakeAmount),
+        tipAmount: tipAmount ? parseFloat(tipAmount) : 0,
       }),
     });
     setSubmitting(false);
@@ -82,6 +85,7 @@ export default function DealerTablePage() {
       setToast(`Rake $${parseFloat(rakeAmount).toFixed(2)} recorded`);
       setPotAmount("");
       setRakeAmount("");
+      setTipAmount("");
       fetchTable();
     }
   }
@@ -115,6 +119,7 @@ export default function DealerTablePage() {
   const rakeHistory = session.rakeRecords;
   const totalRake = rakeHistory.reduce((sum, r) => sum + r.rakeAmount, 0);
   const totalPots = rakeHistory.reduce((sum, r) => sum + r.potAmount, 0);
+  const totalTips = rakeHistory.reduce((sum, r) => sum + r.tipAmount, 0);
 
   return (
     <div style={{ animation: "floatUp 0.5s ease-out forwards" }}>
@@ -183,6 +188,10 @@ export default function DealerTablePage() {
                 <span className="text-sm font-bold" style={{ color: "var(--accent-gold)" }}>${totalRake.toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center">
+                <span className="text-xs text-muted">Total Tips</span>
+                <span className="text-sm font-bold" style={{ color: "var(--felt-green-light)" }}>${totalTips.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between items-center">
                 <span className="text-xs text-muted">Hands</span>
                 <span className="text-sm font-bold">{rakeHistory.length}</span>
               </div>
@@ -219,6 +228,19 @@ export default function DealerTablePage() {
                   style={{ color: "var(--foreground)" }}
                 />
               </div>
+              <div>
+                <label className="block text-[10px] text-muted mb-1">Tip Amount ($)</label>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.25"
+                  value={tipAmount}
+                  onChange={e => setTipAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full rounded-lg border border-card-border bg-transparent px-3 py-2 text-sm outline-none focus:border-accent-gold/50"
+                  style={{ color: "var(--foreground)" }}
+                />
+              </div>
               <button
                 onClick={recordRake}
                 disabled={!potAmount || !rakeAmount || parseFloat(rakeAmount) <= 0 || submitting}
@@ -242,7 +264,8 @@ export default function DealerTablePage() {
                 <div key={r.id} className="flex items-center px-5 py-2.5 border-b border-card-border/50 last:border-0 text-xs">
                   <span className="flex-1 text-muted">{new Date(r.createdAt).toLocaleTimeString()}</span>
                   <span className="text-muted mr-3">Pot: ${r.potAmount.toFixed(2)}</span>
-                  <span className="font-bold" style={{ color: "var(--accent-gold)" }}>${r.rakeAmount.toFixed(2)}</span>
+                  <span className="font-bold mr-3" style={{ color: "var(--accent-gold)" }}>${r.rakeAmount.toFixed(2)}</span>
+                  {r.tipAmount > 0 && <span className="font-medium" style={{ color: "var(--felt-green-light)" }}>+${r.tipAmount.toFixed(2)} tip</span>}
                 </div>
               ))
             )}

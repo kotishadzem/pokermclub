@@ -162,5 +162,6 @@ model RakeRecord {
   player         Player?      @relation(fields: [playerId], references: [id])
   potAmount      Float
   rakeAmount     Float
+  tipAmount      Float        @default(0)
   createdAt      DateTime     @default(now())
 }

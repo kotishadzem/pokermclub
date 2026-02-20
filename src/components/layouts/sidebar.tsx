@@ -17,6 +17,7 @@ const NAV_CONFIG: Record<string, NavItem[]> = {
     { label: "Users", href: "/admin/users", icon: "⦿" },
     { label: "Game Types", href: "/admin/game-types", icon: "♠" },
     { label: "Player Statuses", href: "/admin/player-statuses", icon: "★" },
+    { label: "Tables", href: "/admin/tables", icon: "▣" },
     { label: "Rakeback", href: "/admin/rakeback-config", icon: "%" },
     { label: "Players", href: "/players/list", icon: "♟" },
   ],

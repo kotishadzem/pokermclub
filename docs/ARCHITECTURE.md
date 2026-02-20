@@ -37,7 +37,8 @@ pokemclub/
 │   │   │   ├── users/          # Staff user management (CRUD)
 │   │   │   ├── game-types/     # Game type configuration
 │   │   │   ├── player-statuses/# Player status configuration
-│   │   │   └── rakeback-config/# Rakeback % per player
+│   │   │   ├── rakeback-config/# Rakeback % per player
+│   │   │   └── tables/         # Table CRUD management (admin)
 │   │   ├── pitboss/            # Pit Boss role pages
 │   │   │   ├── floor-plan/     # Graphical drag-drop floor plan
 │   │   │   ├── tables/         # Table CRUD management
@@ -131,14 +132,14 @@ pokemclub/
 - `DELETE /api/waiting-list/[id]` — Remove from list
 
 ### Rake
-- `POST /api/rake` — Record rake (pot amount + rake amount)
-- `GET /api/rake?tableSessionId=` — Get rake history for session
+- `POST /api/rake` — Record rake (pot amount + rake amount + tip amount)
+- `GET /api/rake?tableSessionId=` — Get rake history for session (includes totalTips)
 
 ### Rakeback
 - `GET /api/rakeback?playerId=` — Calculate rakeback for player(s)
 
 ### Admin
-- `GET /api/admin/stats` — Dashboard stats (player count, open tables, today's rake, staff, recent activity)
+- `GET /api/admin/stats` — Dashboard stats (player count, open tables, today's rake, today's tips, staff, recent activity)
 - `GET/POST /api/users` — List/create staff users
 - `PUT/DELETE /api/users/[id]` — Update/deactivate user
 - `GET/POST /api/game-types` — List/create game types
@@ -163,7 +164,7 @@ pokemclub/
 - **TableSeat** — Player seated at a table during a session
 - **WaitingList** — Queue for tables
 - **Transaction** — All financial operations (buy-in, cash-out, deposit, withdrawal, rakeback payout)
-- **RakeRecord** — Rake collected per pot per session
+- **RakeRecord** — Rake and tips collected per pot per session (fields: potAmount, rakeAmount, tipAmount)
 
 ### Key Relationships
 
