@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useLiveData } from "@/lib/use-live-data";
 
 interface SeatData {
   id: string;
@@ -62,7 +63,7 @@ export default function DealerTablePage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { fetchTable(); }, [fetchTable]);
+  useLiveData(fetchTable, 3000);
 
   async function recordRake() {
     if (!data?.tableSession || !potAmount || !rakeAmount) return;

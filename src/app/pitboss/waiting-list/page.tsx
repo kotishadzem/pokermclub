@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useLiveData } from "@/lib/use-live-data";
 
 interface WLEntry {
   id: string;
@@ -22,16 +23,17 @@ export default function WaitingListPage() {
   const [selectedTableId, setSelectedTableId] = useState("");
   const [toast, setToast] = useState("");
 
-  const fetchEntries = useCallback(async () => {
-    const res = await fetch("/api/waiting-list");
-    setEntries(await res.json());
+  const fetchAll = useCallback(async () => {
+    const [entriesRes, tablesRes] = await Promise.all([
+      fetch("/api/waiting-list"),
+      fetch("/api/tables"),
+    ]);
+    setEntries(await entriesRes.json());
+    setTables(await tablesRes.json());
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    fetchEntries();
-    fetch("/api/tables").then(r => r.json()).then(setTables);
-  }, [fetchEntries]);
+  useLiveData(fetchAll, 5000);
 
   useEffect(() => {
     if (playerSearch.length < 2) { setPlayerResults([]); return; }
@@ -60,12 +62,12 @@ export default function WaitingListPage() {
     setSelectedPlayerName("");
     setToast("Added to waiting list");
     setTimeout(() => setToast(""), 3000);
-    fetchEntries();
+    fetchAll();
   }
 
   async function removeEntry(id: string) {
     await fetch(`/api/waiting-list/${id}`, { method: "DELETE" });
-    fetchEntries();
+    fetchAll();
   }
 
   // Group by table

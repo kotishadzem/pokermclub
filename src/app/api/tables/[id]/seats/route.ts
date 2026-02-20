@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/api-auth";
+import { bumpVersion } from "@/lib/version";
 import { NextRequest, NextResponse } from "next/server";
 
 // Seat a player
@@ -33,6 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     include: { player: { select: { id: true, firstName: true, lastName: true } } },
   });
 
+  bumpVersion();
   return NextResponse.json(seat, { status: 201 });
 }
 
@@ -61,5 +63,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     },
   });
 
+  bumpVersion();
   return NextResponse.json(table);
 }

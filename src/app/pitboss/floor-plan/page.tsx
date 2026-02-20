@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import { useLiveData } from "@/lib/use-live-data";
 
 interface Seat {
   id: string;
@@ -31,6 +32,7 @@ interface TableData {
   waitingList: WLEntry[];
 }
 interface PlayerOption { id: string; firstName: string; lastName: string; }
+interface DealerOption { id: string; name: string; }
 
 export default function FloorPlanPage() {
   const [tables, setTables] = useState<TableData[]>([]);
@@ -38,6 +40,8 @@ export default function FloorPlanPage() {
   const [playerSearch, setPlayerSearch] = useState("");
   const [playerResults, setPlayerResults] = useState<PlayerOption[]>([]);
   const [seatNumber, setSeatNumber] = useState(1);
+  const [dealers, setDealers] = useState<DealerOption[]>([]);
+  const [selectedDealerId, setSelectedDealerId] = useState("");
   const dragRef = useRef<{ id: string; startX: number; startY: number; origX: number; origY: number } | null>(null);
   const floorRef = useRef<HTMLDivElement>(null);
 
@@ -51,7 +55,11 @@ export default function FloorPlanPage() {
     }
   }, [selected]);
 
-  useEffect(() => { fetchTables(); }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+  useLiveData(fetchTables, 3000);
+
+  useEffect(() => {
+    fetch("/api/dealers").then(r => r.json()).then(setDealers).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (playerSearch.length < 2) { setPlayerResults([]); return; }
@@ -96,7 +104,8 @@ export default function FloorPlanPage() {
   }, [tables]);
 
   async function openTable(id: string) {
-    await fetch(`/api/tables/${id}/session`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+    await fetch(`/api/tables/${id}/session`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dealerId: selectedDealerId || null }) });
+    setSelectedDealerId("");
     fetchTables();
   }
 
@@ -230,13 +239,37 @@ export default function FloorPlanPage() {
             {/* Open/Close */}
             <div className="px-5 py-3 border-b border-card-border">
               {selected.status === "OPEN" ? (
-                <button onClick={() => closeTable(selected.id)} className="w-full rounded-lg border border-danger/30 py-2 text-xs font-semibold tracking-wider uppercase text-danger hover:bg-danger/10 transition-colors cursor-pointer">
-                  Close Table
-                </button>
+                <>
+                  {activeSession?.dealer && (
+                    <div className="flex items-center gap-2 mb-2 text-xs text-muted">
+                      <span className="text-accent-gold-dim">⦿</span>
+                      <span>Dealer: <strong className="text-foreground">{activeSession.dealer.name}</strong></span>
+                    </div>
+                  )}
+                  <button onClick={() => closeTable(selected.id)} className="w-full rounded-lg border border-danger/30 py-2 text-xs font-semibold tracking-wider uppercase text-danger hover:bg-danger/10 transition-colors cursor-pointer">
+                    Close Table
+                  </button>
+                </>
               ) : (
-                <button onClick={() => openTable(selected.id)} className="w-full rounded-lg py-2 text-xs font-semibold tracking-wider uppercase cursor-pointer" style={{ background: "linear-gradient(135deg, var(--felt-green), var(--felt-green-light))", color: "var(--foreground)" }}>
-                  Open Table
-                </button>
+                <>
+                  {dealers.length > 0 && (
+                    <div className="mb-2">
+                      <label className="block text-[10px] text-muted mb-1 tracking-wider uppercase">Assign Dealer</label>
+                      <select
+                        value={selectedDealerId}
+                        onChange={e => setSelectedDealerId(e.target.value)}
+                        className="w-full rounded-lg border border-card-border bg-card-bg px-3 py-1.5 text-xs outline-none cursor-pointer"
+                        style={{ color: "var(--foreground)" }}
+                      >
+                        <option value="">No dealer</option>
+                        {dealers.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  <button onClick={() => openTable(selected.id)} className="w-full rounded-lg py-2 text-xs font-semibold tracking-wider uppercase cursor-pointer" style={{ background: "linear-gradient(135deg, var(--felt-green), var(--felt-green-light))", color: "var(--foreground)" }}>
+                    Open Table
+                  </button>
+                </>
               )}
             </div>
 

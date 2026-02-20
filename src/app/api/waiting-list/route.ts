@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/api-auth";
+import { bumpVersion } from "@/lib/version";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET() {
@@ -32,5 +33,6 @@ export async function POST(req: NextRequest) {
     include: { player: { select: { firstName: true, lastName: true } }, table: { select: { name: true } } },
   });
 
+  bumpVersion();
   return NextResponse.json(entry, { status: 201 });
 }

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/api-auth";
+import { bumpVersion } from "@/lib/version";
 import { NextRequest, NextResponse } from "next/server";
 
 // Open a table session
@@ -23,6 +24,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     data: { tableId: id, dealerId: dealerId || null },
   });
 
+  bumpVersion();
   return NextResponse.json(session, { status: 201 });
 }
 
@@ -54,5 +56,6 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
 
   await prisma.table.update({ where: { id }, data: { status: "CLOSED" } });
 
+  bumpVersion();
   return NextResponse.json({ ok: true });
 }

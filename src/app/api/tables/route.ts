@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/api-auth";
+import { bumpVersion } from "@/lib/version";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET() {
@@ -45,5 +46,6 @@ export async function POST(req: NextRequest) {
     include: { gameType: true },
   });
 
+  bumpVersion();
   return NextResponse.json(table, { status: 201 });
 }

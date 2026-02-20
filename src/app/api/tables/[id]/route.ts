@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/api-auth";
+import { bumpVersion } from "@/lib/version";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -15,6 +16,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     include: { gameType: true },
   });
 
+  bumpVersion();
   return NextResponse.json(table);
 }
 
@@ -24,5 +26,6 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
 
   const { id } = await params;
   await prisma.table.delete({ where: { id } });
+  bumpVersion();
   return NextResponse.json({ ok: true });
 }

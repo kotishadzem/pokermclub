@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useLiveData } from "@/lib/use-live-data";
 
 interface PlayerOption {
   id: string;
@@ -61,10 +62,13 @@ export default function CashierDashboard() {
   const [toast, setToast] = useState("");
   const [dayReport, setDayReport] = useState<DayReport | null>(null);
 
-  // Fetch today's summary
-  useEffect(() => {
-    fetch("/api/transactions/reports").then(r => r.json()).then(setDayReport).catch(() => {});
+  // Fetch today's summary (live-polled)
+  const fetchReport = useCallback(async () => {
+    const res = await fetch("/api/transactions/reports");
+    setDayReport(await res.json());
   }, []);
+
+  useLiveData(fetchReport, 5000);
 
   // Player search debounce
   useEffect(() => {

@@ -71,7 +71,9 @@ pokemclub/
 │   │       └── sidebar.tsx     # Role-based sidebar navigation
 │   ├── lib/
 │   │   ├── prisma.ts           # Prisma client singleton (PrismaPg adapter)
-│   │   └── api-auth.ts         # API route auth helper (requireRole)
+│   │   ├── api-auth.ts         # API route auth helper (requireRole)
+│   │   ├── version.ts          # Global version counter for real-time polling
+│   │   └── use-live-data.ts    # Client hook: polls /api/version, re-fetches on change
 │   ├── types/
 │   │   └── next-auth.d.ts      # NextAuth type extensions
 │   └── generated/prisma/       # Generated Prisma client (gitignored)
@@ -136,10 +138,17 @@ pokemclub/
 - `GET /api/rakeback?playerId=` — Calculate rakeback for player(s)
 
 ### Admin
+- `GET /api/admin/stats` — Dashboard stats (player count, open tables, today's rake, staff, recent activity)
 - `GET/POST /api/users` — List/create staff users
 - `PUT/DELETE /api/users/[id]` — Update/deactivate user
 - `GET/POST /api/game-types` — List/create game types
 - `GET/POST /api/player-statuses` — List/create player statuses
+
+### Dealers
+- `GET /api/dealers` — List active dealers (for assignment dropdown)
+
+### Real-time
+- `GET /api/version` — Returns global version counter (for smart polling)
 
 ## Database Schema
 
@@ -195,3 +204,20 @@ docker compose exec app npm run seed            # Seed data
 5. **Cashier Interface** ✅ — Player search, buy-in/cash-out, transaction history, daily reports
 6. **Dealer Interface** ✅ — Assigned table view, seat map, rake recording per pot
 7. **Rakeback System** ✅ — Per-player rakeback %, calculation, balance tracking, admin config
+8. **Admin Dashboard + Dealer Assignment + Real-time** ✅ — Live stats & activity feed, dealer dropdown on floor plan, version-counter polling (3-10s intervals)
+
+## Real-time Update System
+
+Uses lightweight version-counter polling instead of WebSockets:
+
+1. **Server side**: `src/lib/version.ts` holds a `globalThis` counter. Every mutation API route calls `bumpVersion()` after successful writes.
+2. **API**: `GET /api/version` returns the current counter value (`force-dynamic`).
+3. **Client hook**: `useLiveData(fetchFn, intervalMs)` polls `/api/version` every N ms. Only calls `fetchFn` when version changes.
+
+| Screen | Poll Interval | Fetch Function |
+|--------|--------------|----------------|
+| Floor Plan (pitboss) | 3s | Tables + sessions + seats |
+| Dealer Table | 3s | Assigned table + seats + rake |
+| Waiting List | 5s | Entries + tables |
+| Cashier Dashboard | 5s | Daily transaction report |
+| Admin Dashboard | 10s | Stats + recent activity |
