@@ -39,6 +39,7 @@ pokemclub/
 │   │   │   ├── player-statuses/# Player status configuration
 │   │   │   ├── bank-accounts/  # Bank account management
 │   │   │   ├── rakeback-config/# Rakeback % per player
+│   │   │   ├── opening-balances/# Daily opening balance configuration
 │   │   │   └── tables/         # Table CRUD management (admin)
 │   │   ├── pitboss/            # Pit Boss role pages
 │   │   │   ├── floor-plan/     # Graphical drag-drop floor plan
@@ -66,6 +67,7 @@ pokemclub/
 │   │       ├── dealer/         # Dealer's assigned table
 │   │       ├── game-types/     # Game type CRUD
 │   │       ├── bank-accounts/  # Bank account CRUD (soft-delete)
+│   │       ├── opening-balances/# Opening balance GET + upsert
 │   │       ├── player-statuses/# Player status CRUD
 │   │       └── upload/         # File upload (player photos)
 │   ├── components/
@@ -88,7 +90,7 @@ pokemclub/
 
 | Role | Routes | Capabilities |
 |------|--------|-------------|
-| Admin | `/admin/*`, all routes | Full system access, user management, configuration, rakeback config |
+| Admin | `/admin/*`, all routes | Full system access, user management, configuration, rakeback config, opening balances |
 | Pit Boss | `/pitboss/*`, `/players/*` | Floor control, tables, waiting list, player placement |
 | Cashier | `/cashier/*`, `/players/*` | Financial operations, buy-in/cash-out, transaction history, reports |
 | Dealer | `/dealer/*` | View assigned table, record rake per pot |
@@ -125,8 +127,12 @@ pokemclub/
 
 ### Transactions
 - `GET /api/transactions?type=&from=&to=&limit=` — List transactions with filters
-- `POST /api/transactions` — Create transaction
-- `GET /api/transactions/reports?date=` — Daily report with aggregates + per-channel breakdown (Cash, per-bank-account, Deposits)
+- `POST /api/transactions` — Create transaction (outgoing transactions check available balance: opening + in - out; returns 400 "Insufficient funds" if exceeded)
+- `GET /api/transactions/reports?date=` — Daily report with aggregates + per-channel breakdown (Cash, per-bank-account, Deposits). Each channel includes `opening`, `in`, `out`, `net`, and `balance` fields.
+
+### Opening Balances
+- `GET /api/opening-balances?date=` — Get opening balances for a date
+- `POST /api/opening-balances` — Upsert opening balances (Admin only). Body: `{ date, time, balances: [{ channel, amount }] }`. Channel is `"CASH"`, `"DEPOSITS"`, or a bank account ID.
 
 ### Waiting List
 - `GET /api/waiting-list` — List entries (grouped by table)
@@ -169,13 +175,15 @@ pokemclub/
 - **WaitingList** — Queue for tables
 - **BankAccount** — Bank accounts for bank payment method (name, active flag for soft-delete)
 - **Transaction** — All financial operations (buy-in, cash-out, deposit, withdrawal, rakeback payout). Includes `paymentMethod` (CASH/BANK) and optional `bankAccountId` for bank transactions.
+- **OpeningBalance** — Starting balance per channel per date. Channel is `"CASH"`, `"DEPOSITS"`, or a bank account ID. Unique on `[date, channel]`. Used for balance checks on outgoing transactions and displayed on dashboard/reports.
 - **RakeRecord** — Rake and tips collected per pot per session (fields: potAmount, rakeAmount, tipAmount)
 
 ### Key Relationships
 
 ```
 User (staff) ──┬── TableSession (as dealer)
-               └── Transaction (recorded by)
+               ├── Transaction (recorded by)
+               └── OpeningBalance (set by)
 
 Player ──┬── TableSeat (seated at)
          ├── WaitingList (queued for)
@@ -211,6 +219,7 @@ docker compose exec app npm run seed            # Seed data
 6. **Dealer Interface** ✅ — Assigned table view, seat map, rake recording per pot
 7. **Rakeback System** ✅ — Per-player rakeback %, calculation, balance tracking, admin config
 8. **Admin Dashboard + Dealer Assignment + Real-time** ✅ — Live stats & activity feed, dealer dropdown on floor plan, version-counter polling (3-10s intervals)
+9. **Opening Balances** ✅ — Per-channel daily opening balances (Cash, bank accounts, Deposits), balance validation on outgoing transactions, OPENING/IN/OUT/BALANCE channel cards on dashboard and reports
 
 ## Real-time Update System
 
