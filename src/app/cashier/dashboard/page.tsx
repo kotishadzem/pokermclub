@@ -59,10 +59,18 @@ const ACTION_META: Record<ActionType, { label: string; icon: string; color: stri
   WITHDRAWAL: { label: "Withdrawal", icon: "◇", color: "var(--muted)",           bgColor: "rgba(107, 124, 116, 0.12)", borderColor: "rgba(107, 124, 116, 0.25)" },
 };
 
-function Toast({ message, onClose }: { message: string; onClose: () => void }) {
-  useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t); }, [onClose]);
+function Toast({ message, type, onClose }: { message: string; type: "success" | "error"; onClose: () => void }) {
+  useEffect(() => { const t = setTimeout(onClose, 4000); return () => clearTimeout(t); }, [onClose]);
   return (
-    <div className="fixed top-6 right-6 z-50 rounded-lg border px-5 py-3 text-sm font-medium shadow-xl" style={{ animation: "floatUp 0.3s ease-out", borderColor: "rgba(26, 107, 69, 0.5)", backgroundColor: "rgba(13, 74, 46, 0.9)", color: "var(--foreground)" }}>
+    <div
+      className="fixed top-6 right-6 z-50 rounded-lg border px-5 py-3 text-sm font-medium shadow-xl backdrop-blur-sm"
+      style={{
+        animation: "floatUp 0.3s ease-out",
+        borderColor: type === "success" ? "rgba(26, 107, 69, 0.5)" : "rgba(199, 69, 69, 0.5)",
+        backgroundColor: type === "success" ? "rgba(13, 74, 46, 0.9)" : "rgba(120, 30, 30, 0.9)",
+        color: "var(--foreground)",
+      }}
+    >
       {message}
     </div>
   );
@@ -76,7 +84,7 @@ export default function CashierDashboard() {
   const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [dayReport, setDayReport] = useState<DayReport | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "BANK">("CASH");
   const [bankAccountId, setBankAccountId] = useState("");
@@ -139,7 +147,7 @@ export default function CashierDashboard() {
       });
       if (res.ok) {
         const meta = ACTION_META[activeAction];
-        setToast(`${meta.label} of $${parseFloat(amount).toFixed(2)} recorded`);
+        setToast({ message: `${meta.label} of $${parseFloat(amount).toFixed(2)} recorded`, type: "success" });
         setActiveAction(null);
         setAmount("");
         setNotes("");
@@ -148,10 +156,10 @@ export default function CashierDashboard() {
         refreshPlayer();
       } else {
         const err = await res.json();
-        setToast(err.error || "Transaction failed");
+        setToast({ message: err.error || "Transaction failed", type: "error" });
       }
     } catch {
-      setToast("Transaction failed");
+      setToast({ message: "Transaction failed", type: "error" });
     }
     setSubmitting(false);
   }
@@ -201,7 +209,7 @@ export default function CashierDashboard() {
 
   return (
     <div style={{ animation: "floatUp 0.5s ease-out forwards" }}>
-      {toast && <Toast message={toast} onClose={() => setToast("")} />}
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
       {/* Header */}
       <div className="mb-6">
