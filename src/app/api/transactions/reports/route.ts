@@ -48,6 +48,52 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Per-channel breakdown
+  const cashChannel = { name: "Cash", icon: "cash", in: 0, out: 0, net: 0 };
+  const depositChannel = { name: "Deposits", icon: "deposit", in: 0, out: 0, net: 0 };
+  const bankChannels: Record<string, { name: string; icon: string; in: number; out: number; net: number }> = {};
+
+  for (const t of transactions) {
+    switch (t.type) {
+      case "BUY_IN":
+        if (t.paymentMethod === "BANK" && t.bankAccount) {
+          if (!bankChannels[t.bankAccount.id]) {
+            bankChannels[t.bankAccount.id] = { name: t.bankAccount.name, icon: "bank", in: 0, out: 0, net: 0 };
+          }
+          bankChannels[t.bankAccount.id].in += t.amount;
+        } else {
+          cashChannel.in += t.amount;
+        }
+        break;
+      case "CASH_OUT":
+        if (t.paymentMethod === "BANK" && t.bankAccount) {
+          if (!bankChannels[t.bankAccount.id]) {
+            bankChannels[t.bankAccount.id] = { name: t.bankAccount.name, icon: "bank", in: 0, out: 0, net: 0 };
+          }
+          bankChannels[t.bankAccount.id].out += t.amount;
+        } else {
+          cashChannel.out += t.amount;
+        }
+        break;
+      case "DEPOSIT":
+        depositChannel.in += t.amount;
+        break;
+      case "WITHDRAWAL":
+        depositChannel.out += t.amount;
+        break;
+    }
+  }
+
+  cashChannel.net = cashChannel.in - cashChannel.out;
+  depositChannel.net = depositChannel.in - depositChannel.out;
+  Object.values(bankChannels).forEach(b => { b.net = b.in - b.out; });
+
+  const channels = [
+    cashChannel,
+    ...Object.values(bankChannels),
+    depositChannel,
+  ];
+
   // Rake collected today
   const rakeRecords = await prisma.rakeRecord.findMany({
     where: { createdAt: { gte: dayStart, lte: dayEnd } },
@@ -57,6 +103,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     date: dateStr,
     summary: { ...summary, totalRake },
+    channels,
     transactions,
   });
 }

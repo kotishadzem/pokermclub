@@ -126,7 +126,7 @@ pokemclub/
 ### Transactions
 - `GET /api/transactions?type=&from=&to=&limit=` — List transactions with filters
 - `POST /api/transactions` — Create transaction
-- `GET /api/transactions/reports?date=` — Daily report with aggregates
+- `GET /api/transactions/reports?date=` — Daily report with aggregates + per-channel breakdown (Cash, per-bank-account, Deposits)
 
 ### Waiting List
 - `GET /api/waiting-list` — List entries (grouped by table)
