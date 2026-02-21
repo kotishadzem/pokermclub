@@ -18,6 +18,8 @@ interface ReportData {
   date: string;
   summary: {
     totalBuyIns: number;
+    totalBuyInsCash: number;
+    totalBuyInsBank: number;
     totalCashOuts: number;
     totalDeposits: number;
     totalWithdrawals: number;
@@ -110,10 +112,14 @@ export default function ReportsPage() {
       ) : s && (
         <>
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
             <div className="rounded-xl border border-card-border bg-card-bg/60 px-5 py-4">
-              <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1.5">Total Buy-ins</p>
-              <p className="text-2xl font-bold" style={{ color: "var(--felt-green-light)" }}>${s.totalBuyIns.toFixed(2)}</p>
+              <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1.5">Buy-ins (Cash)</p>
+              <p className="text-2xl font-bold" style={{ color: "var(--felt-green-light)" }}>${s.totalBuyInsCash.toFixed(2)}</p>
+            </div>
+            <div className="rounded-xl border border-card-border bg-card-bg/60 px-5 py-4">
+              <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1.5">Buy-ins (Bank)</p>
+              <p className="text-2xl font-bold" style={{ color: "var(--accent-gold)" }}>${s.totalBuyInsBank.toFixed(2)}</p>
             </div>
             <div className="rounded-xl border border-card-border bg-card-bg/60 px-5 py-4">
               <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1.5">Total Cash-outs</p>
@@ -131,10 +137,10 @@ export default function ReportsPage() {
               <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1.5">Rake Collected</p>
               <p className="text-2xl font-bold" style={{ color: "var(--accent-gold-dim)" }}>${s.totalRake.toFixed(2)}</p>
             </div>
-            <div className="rounded-xl border px-5 py-4" style={{ borderColor: netFlow >= 0 ? "rgba(26, 107, 69, 0.4)" : "rgba(199, 69, 69, 0.4)", backgroundColor: netFlow >= 0 ? "rgba(13, 74, 46, 0.15)" : "rgba(199, 69, 69, 0.08)" }}>
+            <div className="rounded-xl border px-5 py-4 lg:col-span-2" style={{ borderColor: netFlow >= 0 ? "rgba(26, 107, 69, 0.4)" : "rgba(199, 69, 69, 0.4)", backgroundColor: netFlow >= 0 ? "rgba(13, 74, 46, 0.15)" : "rgba(199, 69, 69, 0.08)" }}>
               <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1.5">Net Flow</p>
               <p className="text-2xl font-bold" style={{ color: netFlow >= 0 ? "var(--felt-green-light)" : "var(--danger)" }}>
-                {netFlow >= 0 ? "+" : ""}${netFlow.toFixed(2)}
+                {netFlow >= 0 ? "+" : "-"}${Math.abs(netFlow).toFixed(2)}
               </p>
             </div>
           </div>
