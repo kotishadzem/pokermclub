@@ -48,17 +48,26 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Fetch opening balances for this date
+  const openingBalances = await prisma.openingBalance.findMany({
+    where: { date: dayStart },
+  });
+  const obMap: Record<string, number> = {};
+  for (const ob of openingBalances) {
+    obMap[ob.channel] = ob.amount;
+  }
+
   // Per-channel breakdown
-  const cashChannel = { name: "Cash", icon: "cash", in: 0, out: 0, net: 0 };
-  const depositChannel = { name: "Deposits", icon: "deposit", in: 0, out: 0, net: 0 };
-  const bankChannels: Record<string, { name: string; icon: string; in: number; out: number; net: number }> = {};
+  const cashChannel = { name: "Cash", icon: "cash", opening: obMap["CASH"] || 0, in: 0, out: 0, net: 0, balance: 0 };
+  const depositChannel = { name: "Deposits", icon: "deposit", opening: obMap["DEPOSITS"] || 0, in: 0, out: 0, net: 0, balance: 0 };
+  const bankChannels: Record<string, { name: string; icon: string; opening: number; in: number; out: number; net: number; balance: number }> = {};
 
   for (const t of transactions) {
     switch (t.type) {
       case "BUY_IN":
         if (t.paymentMethod === "BANK" && t.bankAccount) {
           if (!bankChannels[t.bankAccount.id]) {
-            bankChannels[t.bankAccount.id] = { name: t.bankAccount.name, icon: "bank", in: 0, out: 0, net: 0 };
+            bankChannels[t.bankAccount.id] = { name: t.bankAccount.name, icon: "bank", opening: obMap[t.bankAccount.id] || 0, in: 0, out: 0, net: 0, balance: 0 };
           }
           bankChannels[t.bankAccount.id].in += t.amount;
         } else {
@@ -68,7 +77,7 @@ export async function GET(req: NextRequest) {
       case "CASH_OUT":
         if (t.paymentMethod === "BANK" && t.bankAccount) {
           if (!bankChannels[t.bankAccount.id]) {
-            bankChannels[t.bankAccount.id] = { name: t.bankAccount.name, icon: "bank", in: 0, out: 0, net: 0 };
+            bankChannels[t.bankAccount.id] = { name: t.bankAccount.name, icon: "bank", opening: obMap[t.bankAccount.id] || 0, in: 0, out: 0, net: 0, balance: 0 };
           }
           bankChannels[t.bankAccount.id].out += t.amount;
         } else {
@@ -85,8 +94,21 @@ export async function GET(req: NextRequest) {
   }
 
   cashChannel.net = cashChannel.in - cashChannel.out;
+  cashChannel.balance = cashChannel.opening + cashChannel.net;
   depositChannel.net = depositChannel.in - depositChannel.out;
-  Object.values(bankChannels).forEach(b => { b.net = b.in - b.out; });
+  depositChannel.balance = depositChannel.opening + depositChannel.net;
+  Object.values(bankChannels).forEach(b => {
+    b.net = b.in - b.out;
+    b.balance = b.opening + b.net;
+  });
+
+  // Also include bank accounts that have opening balances but no transactions
+  const allBankAccounts = await prisma.bankAccount.findMany({ where: { active: true } });
+  for (const ba of allBankAccounts) {
+    if (!bankChannels[ba.id] && obMap[ba.id]) {
+      bankChannels[ba.id] = { name: ba.name, icon: "bank", opening: obMap[ba.id], in: 0, out: 0, net: 0, balance: obMap[ba.id] };
+    }
+  }
 
   const channels = [
     cashChannel,

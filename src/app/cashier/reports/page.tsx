@@ -17,9 +17,11 @@ interface TxRecord {
 interface ChannelData {
   name: string;
   icon: "cash" | "bank" | "deposit";
+  opening: number;
   in: number;
   out: number;
   net: number;
+  balance: number;
 }
 
 interface ReportData {
@@ -71,7 +73,7 @@ export default function ReportsPage() {
 
   const s = report?.summary;
   const channels = report?.channels || [];
-  const totalNet = channels.reduce((sum, ch) => sum + ch.net, 0);
+  const totalNet = channels.reduce((sum, ch) => sum + ch.balance, 0);
 
   const channelIcon = (icon: string) => {
     if (icon === "cash") return (
@@ -159,8 +161,14 @@ export default function ReportsPage() {
                     {ch.name}
                   </span>
                 </div>
-                {/* IN / OUT / NET row */}
-                <div className="grid grid-cols-3 divide-x divide-card-border/40">
+                {/* OPENING / IN / OUT / BALANCE row */}
+                <div className="grid grid-cols-4 divide-x divide-card-border/40">
+                  <div className="px-4 py-3.5 text-center">
+                    <p className="text-[9px] font-semibold tracking-widest uppercase text-muted mb-1">OPENING</p>
+                    <p className="text-lg font-bold" style={{ color: "var(--accent-gold-dim)" }}>
+                      ${ch.opening.toFixed(2)}
+                    </p>
+                  </div>
                   <div className="px-4 py-3.5 text-center">
                     <p className="text-[9px] font-semibold tracking-widest uppercase text-muted mb-1">IN</p>
                     <p className="text-lg font-bold" style={{ color: "var(--felt-green-light)" }}>
@@ -173,10 +181,10 @@ export default function ReportsPage() {
                       ${ch.out.toFixed(2)}
                     </p>
                   </div>
-                  <div className="px-4 py-3.5 text-center" style={{ backgroundColor: ch.net >= 0 ? "rgba(13, 74, 46, 0.08)" : "rgba(199, 69, 69, 0.05)" }}>
-                    <p className="text-[9px] font-semibold tracking-widest uppercase text-muted mb-1">NET</p>
-                    <p className="text-lg font-bold" style={{ color: ch.net >= 0 ? "var(--felt-green-light)" : "var(--danger)" }}>
-                      {ch.net >= 0 ? "+" : "-"}${Math.abs(ch.net).toFixed(2)}
+                  <div className="px-4 py-3.5 text-center" style={{ backgroundColor: ch.balance >= 0 ? "rgba(13, 74, 46, 0.08)" : "rgba(199, 69, 69, 0.05)" }}>
+                    <p className="text-[9px] font-semibold tracking-widest uppercase text-muted mb-1">BALANCE</p>
+                    <p className="text-lg font-bold" style={{ color: ch.balance >= 0 ? "var(--felt-green-light)" : "var(--danger)" }}>
+                      ${ch.balance.toFixed(2)}
                     </p>
                   </div>
                 </div>
@@ -197,7 +205,7 @@ export default function ReportsPage() {
                 backgroundColor: totalNet >= 0 ? "rgba(13, 74, 46, 0.15)" : "rgba(199, 69, 69, 0.08)",
               }}
             >
-              <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1.5">Total Net Flow</p>
+              <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1.5">Total Balance</p>
               <p className="text-2xl font-bold" style={{ color: totalNet >= 0 ? "var(--felt-green-light)" : "var(--danger)" }}>
                 {totalNet >= 0 ? "+" : "-"}${Math.abs(totalNet).toFixed(2)}
               </p>

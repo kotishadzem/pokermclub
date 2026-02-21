@@ -29,9 +29,11 @@ interface TxRecord {
 interface ChannelData {
   name: string;
   icon: "cash" | "bank" | "deposit";
+  opening: number;
   in: number;
   out: number;
   net: number;
+  balance: number;
 }
 interface DayReport {
   summary: {
@@ -122,29 +124,36 @@ export default function CashierDashboard() {
   async function submitTransaction() {
     if (!selectedPlayer || !activeAction || !amount) return;
     setSubmitting(true);
-    const res = await fetch("/api/transactions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        playerId: selectedPlayer.id,
-        type: activeAction,
-        amount: parseFloat(amount),
-        notes: notes || null,
-        paymentMethod,
-        bankAccountId: paymentMethod === "BANK" ? bankAccountId : null,
-      }),
-    });
-    setSubmitting(false);
-    if (res.ok) {
-      const meta = ACTION_META[activeAction];
-      setToast(`${meta.label} of $${parseFloat(amount).toFixed(2)} recorded`);
-      setActiveAction(null);
-      setAmount("");
-      setNotes("");
-      setPaymentMethod("CASH");
-      setBankAccountId("");
-      refreshPlayer();
+    try {
+      const res = await fetch("/api/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          playerId: selectedPlayer.id,
+          type: activeAction,
+          amount: parseFloat(amount),
+          notes: notes || null,
+          paymentMethod,
+          bankAccountId: paymentMethod === "BANK" ? bankAccountId : null,
+        }),
+      });
+      if (res.ok) {
+        const meta = ACTION_META[activeAction];
+        setToast(`${meta.label} of $${parseFloat(amount).toFixed(2)} recorded`);
+        setActiveAction(null);
+        setAmount("");
+        setNotes("");
+        setPaymentMethod("CASH");
+        setBankAccountId("");
+        refreshPlayer();
+      } else {
+        const err = await res.json();
+        setToast(err.error || "Transaction failed");
+      }
+    } catch {
+      setToast("Transaction failed");
     }
+    setSubmitting(false);
   }
 
   // Calculate balance from transactions
@@ -167,7 +176,7 @@ export default function CashierDashboard() {
 
   const summary = dayReport?.summary;
   const channels = dayReport?.channels || [];
-  const totalNet = channels.reduce((sum, ch) => sum + ch.net, 0);
+  const totalNet = channels.reduce((sum, ch) => sum + ch.balance, 0);
 
   const channelIcon = (icon: string) => {
     if (icon === "cash") return (
@@ -217,7 +226,11 @@ export default function CashierDashboard() {
                     {ch.name}
                   </span>
                 </div>
-                <div className="grid grid-cols-3 divide-x divide-card-border/40">
+                <div className="grid grid-cols-4 divide-x divide-card-border/40">
+                  <div className="px-3 py-2.5 text-center">
+                    <p className="text-[9px] font-semibold tracking-widest uppercase text-muted mb-0.5">OPENING</p>
+                    <p className="text-sm font-bold" style={{ color: "var(--accent-gold-dim)" }}>${ch.opening.toFixed(2)}</p>
+                  </div>
                   <div className="px-3 py-2.5 text-center">
                     <p className="text-[9px] font-semibold tracking-widest uppercase text-muted mb-0.5">IN</p>
                     <p className="text-sm font-bold" style={{ color: "var(--felt-green-light)" }}>${ch.in.toFixed(2)}</p>
@@ -226,10 +239,10 @@ export default function CashierDashboard() {
                     <p className="text-[9px] font-semibold tracking-widest uppercase text-muted mb-0.5">OUT</p>
                     <p className="text-sm font-bold" style={{ color: "var(--danger)" }}>${ch.out.toFixed(2)}</p>
                   </div>
-                  <div className="px-3 py-2.5 text-center" style={{ backgroundColor: ch.net >= 0 ? "rgba(13, 74, 46, 0.08)" : "rgba(199, 69, 69, 0.05)" }}>
-                    <p className="text-[9px] font-semibold tracking-widest uppercase text-muted mb-0.5">NET</p>
-                    <p className="text-sm font-bold" style={{ color: ch.net >= 0 ? "var(--felt-green-light)" : "var(--danger)" }}>
-                      {ch.net >= 0 ? "+" : "-"}${Math.abs(ch.net).toFixed(2)}
+                  <div className="px-3 py-2.5 text-center" style={{ backgroundColor: ch.balance >= 0 ? "rgba(13, 74, 46, 0.08)" : "rgba(199, 69, 69, 0.05)" }}>
+                    <p className="text-[9px] font-semibold tracking-widest uppercase text-muted mb-0.5">BALANCE</p>
+                    <p className="text-sm font-bold" style={{ color: ch.balance >= 0 ? "var(--felt-green-light)" : "var(--danger)" }}>
+                      ${ch.balance.toFixed(2)}
                     </p>
                   </div>
                 </div>
@@ -248,7 +261,7 @@ export default function CashierDashboard() {
                 backgroundColor: totalNet >= 0 ? "rgba(13, 74, 46, 0.15)" : "rgba(199, 69, 69, 0.08)",
               }}
             >
-              <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Total Net Flow</p>
+              <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Total Balance</p>
               <p className="text-lg font-bold" style={{ color: totalNet >= 0 ? "var(--felt-green-light)" : "var(--danger)" }}>
                 {totalNet >= 0 ? "+" : "-"}${Math.abs(totalNet).toFixed(2)}
               </p>
