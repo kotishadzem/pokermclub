@@ -26,6 +26,13 @@ interface TxRecord {
   createdAt: string;
   user?: { name: string };
 }
+interface ChannelData {
+  name: string;
+  icon: "cash" | "bank" | "deposit";
+  in: number;
+  out: number;
+  net: number;
+}
 interface DayReport {
   summary: {
     totalBuyIns: number;
@@ -38,6 +45,7 @@ interface DayReport {
     totalRake: number;
     transactionCount: number;
   };
+  channels: ChannelData[];
 }
 
 type ActionType = "BUY_IN" | "CASH_OUT" | "DEPOSIT" | "WITHDRAWAL";
@@ -158,6 +166,29 @@ export default function CashierDashboard() {
   }
 
   const summary = dayReport?.summary;
+  const channels = dayReport?.channels || [];
+  const totalNet = channels.reduce((sum, ch) => sum + ch.net, 0);
+
+  const channelIcon = (icon: string) => {
+    if (icon === "cash") return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="6" width="20" height="12" rx="2" />
+        <circle cx="12" cy="12" r="3" />
+        <path d="M2 10h2M20 10h2M2 14h2M20 14h2" />
+      </svg>
+    );
+    if (icon === "bank") return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3" />
+      </svg>
+    );
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <path d="M12 8v8M8 12h8" />
+      </svg>
+    );
+  };
 
   return (
     <div style={{ animation: "floatUp 0.5s ease-out forwards" }}>
@@ -169,34 +200,62 @@ export default function CashierDashboard() {
         <p className="mt-1 text-sm text-muted">Transaction management</p>
       </div>
 
-      {/* Today's Summary */}
-      {summary && (() => {
-        const net = (summary.totalBuyIns + summary.totalDeposits) - (summary.totalCashOuts + summary.totalWithdrawals + summary.totalRakebackPayouts);
-        return (
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6" style={{ animation: "floatUp 0.4s ease-out" }}>
-            <div className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3">
-              <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Buy-ins (Cash)</p>
-              <p className="text-lg font-bold" style={{ color: "var(--felt-green-light)" }}>${summary.totalBuyInsCash.toFixed(2)}</p>
-            </div>
-            <div className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3">
-              <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Buy-ins (Bank)</p>
-              <p className="text-lg font-bold" style={{ color: "var(--accent-gold)" }}>${summary.totalBuyInsBank.toFixed(2)}</p>
-            </div>
-            <div className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3">
-              <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Today Cash-outs</p>
-              <p className="text-lg font-bold" style={{ color: "var(--danger)" }}>${summary.totalCashOuts.toFixed(2)}</p>
-            </div>
+      {/* Today's Channel Summary */}
+      {channels.length > 0 && (
+        <div className="mb-6" style={{ animation: "floatUp 0.4s ease-out" }}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+            {channels.map((ch, i) => (
+              <div
+                key={i}
+                className="rounded-xl border border-card-border bg-card-bg/60 overflow-hidden"
+              >
+                <div className="flex items-center gap-2 px-4 py-2.5 border-b border-card-border/60">
+                  <span style={{ color: ch.icon === "cash" ? "var(--felt-green-light)" : ch.icon === "bank" ? "var(--accent-gold)" : "var(--muted)" }}>
+                    {channelIcon(ch.icon)}
+                  </span>
+                  <span className="text-[10px] font-semibold tracking-wider uppercase" style={{ color: "var(--foreground)" }}>
+                    {ch.name}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 divide-x divide-card-border/40">
+                  <div className="px-3 py-2.5 text-center">
+                    <p className="text-[9px] font-semibold tracking-widest uppercase text-muted mb-0.5">IN</p>
+                    <p className="text-sm font-bold" style={{ color: "var(--felt-green-light)" }}>${ch.in.toFixed(2)}</p>
+                  </div>
+                  <div className="px-3 py-2.5 text-center">
+                    <p className="text-[9px] font-semibold tracking-widest uppercase text-muted mb-0.5">OUT</p>
+                    <p className="text-sm font-bold" style={{ color: "var(--danger)" }}>${ch.out.toFixed(2)}</p>
+                  </div>
+                  <div className="px-3 py-2.5 text-center" style={{ backgroundColor: ch.net >= 0 ? "rgba(13, 74, 46, 0.08)" : "rgba(199, 69, 69, 0.05)" }}>
+                    <p className="text-[9px] font-semibold tracking-widest uppercase text-muted mb-0.5">NET</p>
+                    <p className="text-sm font-bold" style={{ color: ch.net >= 0 ? "var(--felt-green-light)" : "var(--danger)" }}>
+                      {ch.net >= 0 ? "+" : "-"}${Math.abs(ch.net).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <div className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3">
               <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Rake Collected</p>
-              <p className="text-lg font-bold" style={{ color: "var(--accent-gold-dim)" }}>${summary.totalRake.toFixed(2)}</p>
+              <p className="text-lg font-bold" style={{ color: "var(--accent-gold-dim)" }}>${summary?.totalRake.toFixed(2)}</p>
             </div>
-            <div className="rounded-xl border px-4 py-3" style={{ borderColor: net >= 0 ? "rgba(26, 107, 69, 0.4)" : "rgba(199, 69, 69, 0.4)", backgroundColor: net >= 0 ? "rgba(13, 74, 46, 0.15)" : "rgba(199, 69, 69, 0.08)" }}>
-              <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Net</p>
-              <p className="text-lg font-bold" style={{ color: net >= 0 ? "var(--felt-green-light)" : "var(--danger)" }}>{net >= 0 ? "+" : "-"}${Math.abs(net).toFixed(2)}</p>
+            <div
+              className="rounded-xl border px-4 py-3"
+              style={{
+                borderColor: totalNet >= 0 ? "rgba(26, 107, 69, 0.4)" : "rgba(199, 69, 69, 0.4)",
+                backgroundColor: totalNet >= 0 ? "rgba(13, 74, 46, 0.15)" : "rgba(199, 69, 69, 0.08)",
+              }}
+            >
+              <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Total Net Flow</p>
+              <p className="text-lg font-bold" style={{ color: totalNet >= 0 ? "var(--felt-green-light)" : "var(--danger)" }}>
+                {totalNet >= 0 ? "+" : "-"}${Math.abs(totalNet).toFixed(2)}
+              </p>
             </div>
           </div>
-        );
-      })()}
+        </div>
+      )}
 
       {/* Player Search */}
       <div className="rounded-xl border border-card-border bg-card-bg/60 p-5 mb-6">
