@@ -46,8 +46,8 @@ pokemclub/
 │   │   │   ├── tables/         # Table CRUD management
 │   │   │   └── waiting-list/   # Waiting list management
 │   │   ├── cashier/            # Cashier role pages
-│   │   │   ├── dashboard/      # Player search + quick transactions
-│   │   │   ├── transactions/   # Transaction history + filters
+│   │   │   ├── dashboard/      # Channel cards, Rake/Tips/Balance summary, player search, tip collection form
+│   │   │   ├── transactions/   # Transaction history + filters + Recent Tips table
 │   │   │   └── reports/        # Daily financial reports
 │   │   ├── dealer/             # Dealer role pages
 │   │   │   └── table/          # Assigned table + rake recording
@@ -227,7 +227,7 @@ docker compose exec app npm run seed            # Seed data
 7. **Rakeback System** ✅ — Per-player rakeback %, calculation, balance tracking, admin config
 8. **Admin Dashboard + Dealer Assignment + Real-time** ✅ — Live stats & activity feed, dealer dropdown on floor plan, version-counter polling (3-10s intervals)
 9. **Opening Balances** ✅ — Per-channel daily opening balances (Cash, bank accounts, Deposits), balance validation on outgoing transactions, OPENING/IN/OUT/BALANCE channel cards on dashboard and reports
-10. **Tip Collections** ✅ — Cashier records physical tip cash received from dealers per table. Dashboard form + summary cards + history. Reports include `totalTipsCollected`.
+10. **Tip Collections** ✅ — Cashier records physical tip cash received from dealers per table. Dashboard shows summary total (Tips Collected card alongside Rake and Total Balance). Tip collection history is displayed on the Transactions page. Reports include `totalTipsCollected`.
 
 ## Real-time Update System
 
@@ -242,5 +242,5 @@ Uses lightweight version-counter polling instead of WebSockets:
 | Floor Plan (pitboss) | 3s | Tables + sessions + seats |
 | Dealer Table | 3s | Assigned table + seats + rake |
 | Waiting List | 5s | Entries + tables |
-| Cashier Dashboard | 5s | Daily transaction report |
+| Cashier Dashboard | 5s | Daily transaction report + tips report |
 | Admin Dashboard | 10s | Stats + recent activity |
