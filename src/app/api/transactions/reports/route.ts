@@ -25,6 +25,8 @@ export async function GET(req: NextRequest) {
   // Aggregate
   const summary = {
     totalBuyIns: 0,
+    totalBuyInsCash: 0,
+    totalBuyInsBank: 0,
     totalCashOuts: 0,
     totalDeposits: 0,
     totalWithdrawals: 0,
@@ -34,7 +36,11 @@ export async function GET(req: NextRequest) {
 
   for (const t of transactions) {
     switch (t.type) {
-      case "BUY_IN": summary.totalBuyIns += t.amount; break;
+      case "BUY_IN":
+        summary.totalBuyIns += t.amount;
+        if (t.paymentMethod === "BANK") summary.totalBuyInsBank += t.amount;
+        else summary.totalBuyInsCash += t.amount;
+        break;
       case "CASH_OUT": summary.totalCashOuts += t.amount; break;
       case "DEPOSIT": summary.totalDeposits += t.amount; break;
       case "WITHDRAWAL": summary.totalWithdrawals += t.amount; break;

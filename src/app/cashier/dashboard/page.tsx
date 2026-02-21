@@ -29,6 +29,8 @@ interface TxRecord {
 interface DayReport {
   summary: {
     totalBuyIns: number;
+    totalBuyInsCash: number;
+    totalBuyInsBank: number;
     totalCashOuts: number;
     totalDeposits: number;
     totalWithdrawals: number;
@@ -168,26 +170,33 @@ export default function CashierDashboard() {
       </div>
 
       {/* Today's Summary */}
-      {summary && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6" style={{ animation: "floatUp 0.4s ease-out" }}>
-          <div className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3">
-            <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Today Buy-ins</p>
-            <p className="text-lg font-bold" style={{ color: "var(--felt-green-light)" }}>${summary.totalBuyIns.toFixed(2)}</p>
+      {summary && (() => {
+        const net = (summary.totalBuyIns + summary.totalDeposits) - (summary.totalCashOuts + summary.totalWithdrawals + summary.totalRakebackPayouts);
+        return (
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6" style={{ animation: "floatUp 0.4s ease-out" }}>
+            <div className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3">
+              <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Buy-ins (Cash)</p>
+              <p className="text-lg font-bold" style={{ color: "var(--felt-green-light)" }}>${summary.totalBuyInsCash.toFixed(2)}</p>
+            </div>
+            <div className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3">
+              <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Buy-ins (Bank)</p>
+              <p className="text-lg font-bold" style={{ color: "var(--accent-gold)" }}>${summary.totalBuyInsBank.toFixed(2)}</p>
+            </div>
+            <div className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3">
+              <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Today Cash-outs</p>
+              <p className="text-lg font-bold" style={{ color: "var(--danger)" }}>${summary.totalCashOuts.toFixed(2)}</p>
+            </div>
+            <div className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3">
+              <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Rake Collected</p>
+              <p className="text-lg font-bold" style={{ color: "var(--accent-gold-dim)" }}>${summary.totalRake.toFixed(2)}</p>
+            </div>
+            <div className="rounded-xl border px-4 py-3" style={{ borderColor: net >= 0 ? "rgba(26, 107, 69, 0.4)" : "rgba(199, 69, 69, 0.4)", backgroundColor: net >= 0 ? "rgba(13, 74, 46, 0.15)" : "rgba(199, 69, 69, 0.08)" }}>
+              <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Net</p>
+              <p className="text-lg font-bold" style={{ color: net >= 0 ? "var(--felt-green-light)" : "var(--danger)" }}>{net >= 0 ? "+" : "-"}${Math.abs(net).toFixed(2)}</p>
+            </div>
           </div>
-          <div className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3">
-            <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Today Cash-outs</p>
-            <p className="text-lg font-bold" style={{ color: "var(--danger)" }}>${summary.totalCashOuts.toFixed(2)}</p>
-          </div>
-          <div className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3">
-            <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Transactions</p>
-            <p className="text-lg font-bold" style={{ color: "var(--accent-gold)" }}>{summary.transactionCount}</p>
-          </div>
-          <div className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3">
-            <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Rake Collected</p>
-            <p className="text-lg font-bold" style={{ color: "var(--accent-gold-dim)" }}>${summary.totalRake.toFixed(2)}</p>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Player Search */}
       <div className="rounded-xl border border-card-border bg-card-bg/60 p-5 mb-6">
