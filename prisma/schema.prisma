@@ -132,6 +132,16 @@ model WaitingList {
   createdAt  DateTime @default(now())
 }
 
+// ── Bank Accounts ──
+model BankAccount {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  transactions Transaction[]
+}
+
 // ── Transactions ──
 enum TransactionType {
   BUY_IN
@@ -154,6 +164,8 @@ model Transaction {
   amount        Float
   notes         String?
   paymentMethod PaymentMethod?  @default(CASH)
+  bankAccountId String?
+  bankAccount   BankAccount?    @relation(fields: [bankAccountId], references: [id])
   userId        String
   user          User            @relation(fields: [userId], references: [id])
   createdAt     DateTime        @default(now())

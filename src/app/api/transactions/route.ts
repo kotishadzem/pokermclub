@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
     include: {
       player: { select: { id: true, firstName: true, lastName: true } },
       user: { select: { id: true, name: true } },
+      bankAccount: { select: { id: true, name: true } },
     },
     orderBy: { createdAt: "desc" },
     take: limit,
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
   const { error, session } = await requireRole(["ADMIN", "CASHIER"]);
   if (error) return error;
 
-  const { playerId, type, amount, notes, paymentMethod } = await req.json();
+  const { playerId, type, amount, notes, paymentMethod, bankAccountId } = await req.json();
   if (!playerId || !type || amount === undefined) {
     return NextResponse.json({ error: "playerId, type, and amount required" }, { status: 400 });
   }
@@ -54,6 +55,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Amount must be positive" }, { status: 400 });
   }
 
+  if (paymentMethod === "BANK" && !bankAccountId) {
+    return NextResponse.json({ error: "Bank account required for bank payments" }, { status: 400 });
+  }
+
   const transaction = await prisma.transaction.create({
     data: {
       playerId,
@@ -61,6 +66,7 @@ export async function POST(req: NextRequest) {
       amount,
       notes: notes || null,
       paymentMethod: paymentMethod === "BANK" ? "BANK" : "CASH",
+      bankAccountId: paymentMethod === "BANK" ? bankAccountId : null,
       userId: (session!.user as { id: string }).id,
     },
     include: {

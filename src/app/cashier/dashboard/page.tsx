@@ -3,6 +3,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { useLiveData } from "@/lib/use-live-data";
 
+interface BankAccountOption {
+  id: string;
+  name: string;
+}
+
 interface PlayerOption {
   id: string;
   firstName: string;
@@ -62,6 +67,8 @@ export default function CashierDashboard() {
   const [toast, setToast] = useState("");
   const [dayReport, setDayReport] = useState<DayReport | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "BANK">("CASH");
+  const [bankAccountId, setBankAccountId] = useState("");
+  const [bankAccounts, setBankAccounts] = useState<BankAccountOption[]>([]);
 
   // Fetch today's summary (live-polled)
   const fetchReport = useCallback(async () => {
@@ -70,6 +77,11 @@ export default function CashierDashboard() {
   }, []);
 
   useLiveData(fetchReport, 5000);
+
+  // Fetch bank accounts on mount
+  useEffect(() => {
+    fetch("/api/bank-accounts").then(r => r.json()).then(setBankAccounts).catch(() => {});
+  }, []);
 
   // Player search debounce
   useEffect(() => {
@@ -109,6 +121,7 @@ export default function CashierDashboard() {
         amount: parseFloat(amount),
         notes: notes || null,
         paymentMethod,
+        bankAccountId: paymentMethod === "BANK" ? bankAccountId : null,
       }),
     });
     setSubmitting(false);
@@ -119,6 +132,7 @@ export default function CashierDashboard() {
       setAmount("");
       setNotes("");
       setPaymentMethod("CASH");
+      setBankAccountId("");
       refreshPlayer();
     }
   }
@@ -252,7 +266,7 @@ export default function CashierDashboard() {
                 return (
                   <button
                     key={type}
-                    onClick={() => { setActiveAction(isActive ? null : type); setAmount(""); setNotes(""); setPaymentMethod("CASH"); }}
+                    onClick={() => { setActiveAction(isActive ? null : type); setAmount(""); setNotes(""); setPaymentMethod("CASH"); setBankAccountId(""); }}
                     className="rounded-lg border px-4 py-3 text-sm font-semibold tracking-wider uppercase cursor-pointer transition-all duration-200"
                     style={{
                       borderColor: isActive ? meta.color : meta.borderColor,
@@ -325,9 +339,25 @@ export default function CashierDashboard() {
                       </button>
                     </div>
                   </div>
+                  {paymentMethod === "BANK" && (
+                    <div className="min-w-[160px]">
+                      <label className="block text-xs text-muted mb-1">Bank Account</label>
+                      <select
+                        value={bankAccountId}
+                        onChange={e => setBankAccountId(e.target.value)}
+                        className="w-full rounded-lg border border-card-border bg-card-bg px-3 py-2.5 text-sm outline-none cursor-pointer"
+                        style={{ color: "var(--foreground)" }}
+                      >
+                        <option value="">Select account...</option>
+                        {bankAccounts.map(ba => (
+                          <option key={ba.id} value={ba.id}>{ba.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <button
                     onClick={submitTransaction}
-                    disabled={!amount || parseFloat(amount) <= 0 || submitting}
+                    disabled={!amount || parseFloat(amount) <= 0 || submitting || (paymentMethod === "BANK" && !bankAccountId)}
                     className="rounded-lg px-6 py-2.5 text-sm font-semibold tracking-wider uppercase cursor-pointer disabled:opacity-30 transition-opacity"
                     style={{ background: "linear-gradient(135deg, var(--felt-green), var(--felt-green-light))", color: "var(--foreground)" }}
                   >

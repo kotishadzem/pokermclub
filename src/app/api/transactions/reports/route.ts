@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
     include: {
       player: { select: { firstName: true, lastName: true } },
       user: { select: { name: true } },
+      bankAccount: { select: { id: true, name: true } },
     },
     orderBy: { createdAt: "desc" },
   });

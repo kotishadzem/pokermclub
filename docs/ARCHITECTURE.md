@@ -37,6 +37,7 @@ pokemclub/
 │   │   │   ├── users/          # Staff user management (CRUD)
 │   │   │   ├── game-types/     # Game type configuration
 │   │   │   ├── player-statuses/# Player status configuration
+│   │   │   ├── bank-accounts/  # Bank account management
 │   │   │   ├── rakeback-config/# Rakeback % per player
 │   │   │   └── tables/         # Table CRUD management (admin)
 │   │   ├── pitboss/            # Pit Boss role pages
@@ -64,6 +65,7 @@ pokemclub/
 │   │       ├── rakeback/       # Rakeback calculation
 │   │       ├── dealer/         # Dealer's assigned table
 │   │       ├── game-types/     # Game type CRUD
+│   │       ├── bank-accounts/  # Bank account CRUD (soft-delete)
 │   │       ├── player-statuses/# Player status CRUD
 │   │       └── upload/         # File upload (player photos)
 │   ├── components/
@@ -143,6 +145,8 @@ pokemclub/
 - `GET/POST /api/users` — List/create staff users
 - `PUT/DELETE /api/users/[id]` — Update/deactivate user
 - `GET/POST /api/game-types` — List/create game types
+- `GET/POST /api/bank-accounts` — List/create bank accounts (soft-delete via active flag)
+- `PUT/DELETE /api/bank-accounts/[id]` — Update/deactivate bank account
 - `GET/POST /api/player-statuses` — List/create player statuses
 
 ### Dealers
@@ -163,7 +167,8 @@ pokemclub/
 - **TableSession** — Active table session with assigned dealer
 - **TableSeat** — Player seated at a table during a session
 - **WaitingList** — Queue for tables
-- **Transaction** — All financial operations (buy-in, cash-out, deposit, withdrawal, rakeback payout). Includes `paymentMethod` (CASH/BANK).
+- **BankAccount** — Bank accounts for bank payment method (name, active flag for soft-delete)
+- **Transaction** — All financial operations (buy-in, cash-out, deposit, withdrawal, rakeback payout). Includes `paymentMethod` (CASH/BANK) and optional `bankAccountId` for bank transactions.
 - **RakeRecord** — Rake and tips collected per pot per session (fields: potAmount, rakeAmount, tipAmount)
 
 ### Key Relationships

@@ -8,6 +8,7 @@ interface TxRecord {
   amount: number;
   notes: string | null;
   paymentMethod: string | null;
+  bankAccount: { id: string; name: string } | null;
   createdAt: string;
   player: { id: string; firstName: string; lastName: string };
   user: { id: string; name: string };
@@ -184,7 +185,7 @@ export default function TransactionsPage() {
                     ${tx.amount.toFixed(2)}
                   </td>
                   <td className="px-5 py-3 text-xs text-muted">
-                    {tx.paymentMethod === "BANK" ? "Bank" : "Cash"}
+                    {tx.paymentMethod === "BANK" ? (tx.bankAccount ? `Bank - ${tx.bankAccount.name}` : "Bank") : "Cash"}
                   </td>
                   <td className="px-5 py-3 text-muted text-xs max-w-[200px] truncate">{tx.notes || "—"}</td>
                   <td className="px-5 py-3 text-muted text-xs">{tx.user.name}</td>
