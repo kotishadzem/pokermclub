@@ -122,9 +122,16 @@ export async function GET(req: NextRequest) {
   });
   const totalRake = rakeRecords.reduce((sum, r) => sum + r.rakeAmount, 0);
 
+  // Tips collected today (physical cash received by cashier from dealers)
+  const tipCollections = await prisma.tipCollection.aggregate({
+    where: { createdAt: { gte: dayStart, lte: dayEnd } },
+    _sum: { amount: true },
+  });
+  const totalTipsCollected = tipCollections._sum.amount || 0;
+
   return NextResponse.json({
     date: dateStr,
-    summary: { ...summary, totalRake },
+    summary: { ...summary, totalRake, totalTipsCollected },
     channels,
     transactions,
   });

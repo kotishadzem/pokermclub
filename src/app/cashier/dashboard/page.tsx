@@ -3,6 +3,28 @@
 import { useEffect, useState, useCallback } from "react";
 import { useLiveData } from "@/lib/use-live-data";
 
+interface TableOption {
+  id: string;
+  name: string;
+}
+
+interface TipCollectionRecord {
+  id: string;
+  tableId: string;
+  amount: number;
+  notes: string | null;
+  createdAt: string;
+  table: { id: string; name: string };
+  user: { name: string };
+}
+
+interface TipsReport {
+  date: string;
+  grandTotal: number;
+  byTable: { tableId: string; tableName: string; total: number; count: number }[];
+  collections: TipCollectionRecord[];
+}
+
 interface BankAccountOption {
   id: string;
   name: string;
@@ -90,17 +112,30 @@ export default function CashierDashboard() {
   const [bankAccountId, setBankAccountId] = useState("");
   const [bankAccounts, setBankAccounts] = useState<BankAccountOption[]>([]);
 
-  // Fetch today's summary (live-polled)
+  // Tips collection state
+  const [tables, setTables] = useState<TableOption[]>([]);
+  const [tipsReport, setTipsReport] = useState<TipsReport | null>(null);
+  const [tipTableId, setTipTableId] = useState("");
+  const [tipAmount, setTipAmount] = useState("");
+  const [tipNotes, setTipNotes] = useState("");
+  const [submittingTip, setSubmittingTip] = useState(false);
+
+  // Fetch today's summary + tips (live-polled)
   const fetchReport = useCallback(async () => {
-    const res = await fetch("/api/transactions/reports");
-    setDayReport(await res.json());
+    const [reportRes, tipsRes] = await Promise.all([
+      fetch("/api/transactions/reports"),
+      fetch("/api/tips"),
+    ]);
+    setDayReport(await reportRes.json());
+    setTipsReport(await tipsRes.json());
   }, []);
 
   useLiveData(fetchReport, 5000);
 
-  // Fetch bank accounts on mount
+  // Fetch bank accounts + tables on mount
   useEffect(() => {
     fetch("/api/bank-accounts").then(r => r.json()).then(setBankAccounts).catch(() => {});
+    fetch("/api/tables").then(r => r.json()).then((data: TableOption[]) => setTables(data)).catch(() => {});
   }, []);
 
   // Player search debounce
@@ -162,6 +197,35 @@ export default function CashierDashboard() {
       setToast({ message: "Transaction failed", type: "error" });
     }
     setSubmitting(false);
+  }
+
+  async function submitTip() {
+    if (!tipTableId || !tipAmount) return;
+    setSubmittingTip(true);
+    try {
+      const res = await fetch("/api/tips", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tableId: tipTableId,
+          amount: parseFloat(tipAmount),
+          notes: tipNotes || null,
+        }),
+      });
+      if (res.ok) {
+        setToast({ message: `Tip of $${parseFloat(tipAmount).toFixed(2)} collected`, type: "success" });
+        setTipAmount("");
+        setTipNotes("");
+        // Refresh tips report
+        fetch("/api/tips").then(r => r.json()).then(setTipsReport).catch(() => {});
+      } else {
+        const err = await res.json();
+        setToast({ message: err.error || "Tip collection failed", type: "error" });
+      }
+    } catch {
+      setToast({ message: "Tip collection failed", type: "error" });
+    }
+    setSubmittingTip(false);
   }
 
   // Calculate balance from transactions
@@ -488,8 +552,107 @@ export default function CashierDashboard() {
         </div>
       )}
 
+      {/* ── Tip Collections Section ── */}
+      <div className="mt-6" style={{ animation: "floatUp 0.4s ease-out" }}>
+        <div className="rounded-xl border border-card-border bg-card-bg/60 p-5 mb-4">
+          <h3 className="text-xs font-semibold tracking-wider uppercase text-muted mb-3">Collect Tips</h3>
+          <div className="flex gap-3 items-end flex-wrap">
+            <div className="flex-1 min-w-[140px]">
+              <label className="block text-xs text-muted mb-1">Table</label>
+              <select
+                value={tipTableId}
+                onChange={e => setTipTableId(e.target.value)}
+                className="w-full rounded-lg border border-card-border bg-card-bg px-3 py-2.5 text-sm outline-none cursor-pointer"
+                style={{ color: "var(--foreground)" }}
+              >
+                <option value="">Select table...</option>
+                {tables.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex-1 min-w-[120px]">
+              <label className="block text-xs text-muted mb-1">Amount ($)</label>
+              <input
+                type="number"
+                min={0.01}
+                step="0.01"
+                value={tipAmount}
+                onChange={e => setTipAmount(e.target.value)}
+                placeholder="0.00"
+                className="w-full rounded-lg border border-card-border bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent-gold/50"
+                style={{ color: "var(--foreground)" }}
+              />
+            </div>
+            <div className="flex-1 min-w-[120px]">
+              <label className="block text-xs text-muted mb-1">Notes (optional)</label>
+              <input
+                type="text"
+                value={tipNotes}
+                onChange={e => setTipNotes(e.target.value)}
+                placeholder="Optional notes..."
+                className="w-full rounded-lg border border-card-border bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent-gold/50"
+                style={{ color: "var(--foreground)" }}
+              />
+            </div>
+            <button
+              onClick={submitTip}
+              disabled={!tipTableId || !tipAmount || parseFloat(tipAmount) <= 0 || submittingTip}
+              className="rounded-lg px-6 py-2.5 text-sm font-semibold tracking-wider uppercase cursor-pointer disabled:opacity-30 transition-opacity"
+              style={{ background: "linear-gradient(135deg, var(--accent-gold-dim), var(--accent-gold))", color: "var(--foreground)" }}
+            >
+              {submittingTip ? "..." : "Collect"}
+            </button>
+          </div>
+        </div>
+
+        {/* Tips Summary — per-table cards */}
+        {tipsReport && tipsReport.byTable.length > 0 && (
+          <div className="mb-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-3">
+              {tipsReport.byTable.map(tb => (
+                <div
+                  key={tb.tableId}
+                  className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3"
+                >
+                  <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">{tb.tableName}</p>
+                  <p className="text-lg font-bold" style={{ color: "var(--accent-gold)" }}>${tb.total.toFixed(2)}</p>
+                  <p className="text-[10px] text-muted">{tb.count} collection{tb.count !== 1 ? "s" : ""}</p>
+                </div>
+              ))}
+            </div>
+            <div className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3">
+              <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Total Tips Collected</p>
+              <p className="text-lg font-bold" style={{ color: "var(--accent-gold)" }}>${tipsReport.grandTotal.toFixed(2)}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Recent Tips History */}
+        {tipsReport && tipsReport.collections.length > 0 && (
+          <div className="rounded-xl border border-card-border bg-card-bg/60 overflow-hidden">
+            <div className="px-5 py-3 border-b border-card-border">
+              <h3 className="text-xs font-semibold tracking-wider uppercase text-muted">Recent Tips</h3>
+            </div>
+            {tipsReport.collections.map(tc => (
+              <div key={tc.id} className="flex items-center px-5 py-3 border-b border-card-border/50 last:border-0 hover:bg-card-border/20 transition-colors">
+                <div className="flex-1">
+                  <span className="text-sm font-medium" style={{ color: "var(--accent-gold)" }}>{tc.table.name}</span>
+                  {tc.notes && <span className="ml-2 text-xs text-muted">— {tc.notes}</span>}
+                  <p className="text-[10px] text-muted">{tc.user.name}</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-sm font-bold" style={{ color: "var(--accent-gold)" }}>${tc.amount.toFixed(2)}</span>
+                  <p className="text-[10px] text-muted">{new Date(tc.createdAt).toLocaleTimeString()}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Empty state */}
-      {!selectedPlayer && (
+      {!selectedPlayer && !tipsReport?.collections.length && (
         <div className="rounded-xl border border-card-border bg-card-bg/40 p-12 flex flex-col items-center justify-center text-center" style={{ animation: "floatUp 0.4s ease-out" }}>
           <span className="text-4xl text-accent-gold-dim/30 mb-3">◈</span>
           <p className="text-sm text-muted">Search for a player to start a transaction</p>

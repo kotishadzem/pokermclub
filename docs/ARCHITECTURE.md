@@ -63,6 +63,7 @@ pokemclub/
 │   │       ├── transactions/   # Transaction CRUD + reports
 │   │       ├── waiting-list/   # Waiting list management
 │   │       ├── rake/           # Rake recording
+│   │       ├── tips/           # Tip collections (cashier ← dealer)
 │   │       ├── rakeback/       # Rakeback calculation
 │   │       ├── dealer/         # Dealer's assigned table
 │   │       ├── game-types/     # Game type CRUD
@@ -143,6 +144,10 @@ pokemclub/
 - `POST /api/rake` — Record rake (pot amount + rake amount + tip amount)
 - `GET /api/rake?tableSessionId=` — Get rake history for session (includes totalTips)
 
+### Tips
+- `POST /api/tips` — Record tip collection (cashier receives tips from dealer). Body: `{ tableId, amount, notes? }`
+- `GET /api/tips?date=` — Tips report for date (default: today). Returns `{ date, grandTotal, byTable: [{tableId, tableName, total, count}], collections: [...] }`
+
 ### Rakeback
 - `GET /api/rakeback?playerId=` — Calculate rakeback for player(s)
 
@@ -177,6 +182,7 @@ pokemclub/
 - **Transaction** — All financial operations (buy-in, cash-out, deposit, withdrawal, rakeback payout). Includes `paymentMethod` (CASH/BANK) and optional `bankAccountId` for bank transactions.
 - **OpeningBalance** — Starting balance per channel per date. Channel is `"CASH"`, `"DEPOSITS"`, or a bank account ID. Unique on `[date, channel]`. Used for balance checks on outgoing transactions and displayed on dashboard/reports.
 - **RakeRecord** — Rake and tips collected per pot per session (fields: potAmount, rakeAmount, tipAmount)
+- **TipCollection** — Physical tip cash received by cashier from dealer (fields: tableId, amount, notes, userId)
 
 ### Key Relationships
 
@@ -191,7 +197,8 @@ Player ──┬── TableSeat (seated at)
          └── RakeRecord (rake attributed to)
 
 Table ──┬── TableSession (active session)
-        └── WaitingList (queue)
+        ├── WaitingList (queue)
+        └── TipCollection (tips received)
 
 GameType ── Table (game played)
 PlayerStatus ── Player (classification)
@@ -220,6 +227,7 @@ docker compose exec app npm run seed            # Seed data
 7. **Rakeback System** ✅ — Per-player rakeback %, calculation, balance tracking, admin config
 8. **Admin Dashboard + Dealer Assignment + Real-time** ✅ — Live stats & activity feed, dealer dropdown on floor plan, version-counter polling (3-10s intervals)
 9. **Opening Balances** ✅ — Per-channel daily opening balances (Cash, bank accounts, Deposits), balance validation on outgoing transactions, OPENING/IN/OUT/BALANCE channel cards on dashboard and reports
+10. **Tip Collections** ✅ — Cashier records physical tip cash received from dealers per table. Dashboard form + summary cards + history. Reports include `totalTipsCollected`.
 
 ## Real-time Update System
 
