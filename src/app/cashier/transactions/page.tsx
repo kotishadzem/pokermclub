@@ -14,6 +14,23 @@ interface TxRecord {
   user: { id: string; name: string };
 }
 
+interface TipCollectionRecord {
+  id: string;
+  tableId: string;
+  amount: number;
+  notes: string | null;
+  createdAt: string;
+  table: { id: string; name: string };
+  user: { name: string };
+}
+
+interface TipsReport {
+  date: string;
+  grandTotal: number;
+  byTable: { tableId: string; tableName: string; total: number; count: number }[];
+  collections: TipCollectionRecord[];
+}
+
 const TYPE_OPTIONS = [
   { value: "", label: "All Types" },
   { value: "BUY_IN", label: "Buy-in" },
@@ -47,6 +64,11 @@ export default function TransactionsPage() {
   const [toDate, setToDate] = useState("");
   const [playerFilter, setPlayerFilter] = useState("");
   const [limit, setLimit] = useState(50);
+  const [tipsReport, setTipsReport] = useState<TipsReport | null>(null);
+
+  useEffect(() => {
+    fetch("/api/tips").then(r => r.json()).then(setTipsReport).catch(() => {});
+  }, []);
 
   const fetchTransactions = useCallback(async () => {
     setLoading(true);
@@ -205,6 +227,45 @@ export default function TransactionsPage() {
           >
             Load More
           </button>
+        </div>
+      )}
+
+      {/* Recent Tips */}
+      {tipsReport && tipsReport.collections.length > 0 && (
+        <div className="mt-8" style={{ animation: "floatUp 0.4s ease-out" }}>
+          <div className="mb-4">
+            <h2 className="text-lg font-bold tracking-wide" style={{ fontFamily: "var(--font-display)" }}>Recent Tips</h2>
+            <p className="mt-1 text-sm text-muted">
+              {tipsReport.collections.length} tip{tipsReport.collections.length !== 1 ? "s" : ""} — Total: <span style={{ color: "var(--accent-gold)" }}>${tipsReport.grandTotal.toFixed(2)}</span>
+            </p>
+          </div>
+          <div className="rounded-xl border border-card-border bg-card-bg/60 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-card-border">
+                  <th className="text-left px-5 py-3 text-[10px] font-semibold tracking-wider uppercase text-muted">Date/Time</th>
+                  <th className="text-left px-5 py-3 text-[10px] font-semibold tracking-wider uppercase text-muted">Table</th>
+                  <th className="text-right px-5 py-3 text-[10px] font-semibold tracking-wider uppercase text-muted">Amount</th>
+                  <th className="text-left px-5 py-3 text-[10px] font-semibold tracking-wider uppercase text-muted">Notes</th>
+                  <th className="text-left px-5 py-3 text-[10px] font-semibold tracking-wider uppercase text-muted">Cashier</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tipsReport.collections.map(tc => (
+                  <tr key={tc.id} className="border-b border-card-border/50 hover:bg-card-border/20 transition-colors">
+                    <td className="px-5 py-3 text-muted text-xs whitespace-nowrap">
+                      {new Date(tc.createdAt).toLocaleDateString()}<br />
+                      <span className="text-[10px]">{new Date(tc.createdAt).toLocaleTimeString()}</span>
+                    </td>
+                    <td className="px-5 py-3 font-medium" style={{ color: "var(--accent-gold)" }}>{tc.table.name}</td>
+                    <td className="px-5 py-3 text-right font-bold" style={{ color: "var(--accent-gold)" }}>${tc.amount.toFixed(2)}</td>
+                    <td className="px-5 py-3 text-muted text-xs max-w-[200px] truncate">{tc.notes || "—"}</td>
+                    <td className="px-5 py-3 text-muted text-xs">{tc.user.name}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

@@ -67,6 +67,7 @@ interface DayReport {
     totalWithdrawals: number;
     totalRakebackPayouts: number;
     totalRake: number;
+    totalTipsCollected: number;
     transactionCount: number;
   };
   channels: ChannelData[];
@@ -321,23 +322,32 @@ export default function CashierDashboard() {
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3">
               <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Rake Collected</p>
               <p className="text-lg font-bold" style={{ color: "var(--accent-gold-dim)" }}>${summary?.totalRake.toFixed(2)}</p>
             </div>
-            <div
-              className="rounded-xl border px-4 py-3"
-              style={{
-                borderColor: totalNet >= 0 ? "rgba(26, 107, 69, 0.4)" : "rgba(199, 69, 69, 0.4)",
-                backgroundColor: totalNet >= 0 ? "rgba(13, 74, 46, 0.15)" : "rgba(199, 69, 69, 0.08)",
-              }}
-            >
-              <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Total Balance</p>
-              <p className="text-lg font-bold" style={{ color: totalNet >= 0 ? "var(--felt-green-light)" : "var(--danger)" }}>
-                {totalNet >= 0 ? "+" : "-"}${Math.abs(totalNet).toFixed(2)}
-              </p>
+            <div className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3" style={{ borderColor: "rgba(201, 168, 76, 0.3)" }}>
+              <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Tips Collected</p>
+              <p className="text-lg font-bold" style={{ color: "var(--accent-gold)" }}>${summary?.totalTipsCollected?.toFixed(2) ?? "0.00"}</p>
             </div>
+            {(() => {
+              const totalBalance = totalNet + (tipsReport?.grandTotal ?? 0);
+              return (
+                <div
+                  className="rounded-xl border px-4 py-3"
+                  style={{
+                    borderColor: totalBalance >= 0 ? "rgba(26, 107, 69, 0.4)" : "rgba(199, 69, 69, 0.4)",
+                    backgroundColor: totalBalance >= 0 ? "rgba(13, 74, 46, 0.15)" : "rgba(199, 69, 69, 0.08)",
+                  }}
+                >
+                  <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Total Balance</p>
+                  <p className="text-lg font-bold" style={{ color: totalBalance >= 0 ? "var(--felt-green-light)" : "var(--danger)" }}>
+                    {totalBalance >= 0 ? "+" : "-"}${Math.abs(totalBalance).toFixed(2)}
+                  </p>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -606,53 +616,10 @@ export default function CashierDashboard() {
           </div>
         </div>
 
-        {/* Tips Summary — per-table cards */}
-        {tipsReport && tipsReport.byTable.length > 0 && (
-          <div className="mb-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-3">
-              {tipsReport.byTable.map(tb => (
-                <div
-                  key={tb.tableId}
-                  className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3"
-                >
-                  <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">{tb.tableName}</p>
-                  <p className="text-lg font-bold" style={{ color: "var(--accent-gold)" }}>${tb.total.toFixed(2)}</p>
-                  <p className="text-[10px] text-muted">{tb.count} collection{tb.count !== 1 ? "s" : ""}</p>
-                </div>
-              ))}
-            </div>
-            <div className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3">
-              <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Total Tips Collected</p>
-              <p className="text-lg font-bold" style={{ color: "var(--accent-gold)" }}>${tipsReport.grandTotal.toFixed(2)}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Recent Tips History */}
-        {tipsReport && tipsReport.collections.length > 0 && (
-          <div className="rounded-xl border border-card-border bg-card-bg/60 overflow-hidden">
-            <div className="px-5 py-3 border-b border-card-border">
-              <h3 className="text-xs font-semibold tracking-wider uppercase text-muted">Recent Tips</h3>
-            </div>
-            {tipsReport.collections.map(tc => (
-              <div key={tc.id} className="flex items-center px-5 py-3 border-b border-card-border/50 last:border-0 hover:bg-card-border/20 transition-colors">
-                <div className="flex-1">
-                  <span className="text-sm font-medium" style={{ color: "var(--accent-gold)" }}>{tc.table.name}</span>
-                  {tc.notes && <span className="ml-2 text-xs text-muted">— {tc.notes}</span>}
-                  <p className="text-[10px] text-muted">{tc.user.name}</p>
-                </div>
-                <div className="text-right">
-                  <span className="text-sm font-bold" style={{ color: "var(--accent-gold)" }}>${tc.amount.toFixed(2)}</span>
-                  <p className="text-[10px] text-muted">{new Date(tc.createdAt).toLocaleTimeString()}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Empty state */}
-      {!selectedPlayer && !tipsReport?.collections.length && (
+      {!selectedPlayer && (
         <div className="rounded-xl border border-card-border bg-card-bg/40 p-12 flex flex-col items-center justify-center text-center" style={{ animation: "floatUp 0.4s ease-out" }}>
           <span className="text-4xl text-accent-gold-dim/30 mb-3">◈</span>
           <p className="text-sm text-muted">Search for a player to start a transaction</p>
