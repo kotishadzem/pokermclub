@@ -61,6 +61,7 @@ export default function CashierDashboard() {
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState("");
   const [dayReport, setDayReport] = useState<DayReport | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "BANK">("CASH");
 
   // Fetch today's summary (live-polled)
   const fetchReport = useCallback(async () => {
@@ -107,6 +108,7 @@ export default function CashierDashboard() {
         type: activeAction,
         amount: parseFloat(amount),
         notes: notes || null,
+        paymentMethod,
       }),
     });
     setSubmitting(false);
@@ -116,6 +118,7 @@ export default function CashierDashboard() {
       setActiveAction(null);
       setAmount("");
       setNotes("");
+      setPaymentMethod("CASH");
       refreshPlayer();
     }
   }
@@ -249,7 +252,7 @@ export default function CashierDashboard() {
                 return (
                   <button
                     key={type}
-                    onClick={() => { setActiveAction(isActive ? null : type); setAmount(""); setNotes(""); }}
+                    onClick={() => { setActiveAction(isActive ? null : type); setAmount(""); setNotes(""); setPaymentMethod("CASH"); }}
                     className="rounded-lg border px-4 py-3 text-sm font-semibold tracking-wider uppercase cursor-pointer transition-all duration-200"
                     style={{
                       borderColor: isActive ? meta.color : meta.borderColor,
@@ -268,8 +271,8 @@ export default function CashierDashboard() {
             {/* Transaction Form */}
             {activeAction && (
               <div className="mt-4 pt-4 border-t border-card-border" style={{ animation: "floatUp 0.2s ease-out" }}>
-                <div className="flex gap-3 items-end">
-                  <div className="flex-1">
+                <div className="flex gap-3 items-end flex-wrap">
+                  <div className="flex-1 min-w-[120px]">
                     <label className="block text-xs text-muted mb-1">Amount ($)</label>
                     <input
                       type="number"
@@ -283,7 +286,7 @@ export default function CashierDashboard() {
                       autoFocus
                     />
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-[120px]">
                     <label className="block text-xs text-muted mb-1">Notes (optional)</label>
                     <input
                       type="text"
@@ -293,6 +296,34 @@ export default function CashierDashboard() {
                       className="w-full rounded-lg border border-card-border bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent-gold/50"
                       style={{ color: "var(--foreground)" }}
                     />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-muted mb-1">Payment</label>
+                    <div className="flex rounded-lg border border-card-border overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod("CASH")}
+                        className="px-3 py-2.5 text-xs font-semibold tracking-wider uppercase cursor-pointer transition-colors"
+                        style={{
+                          backgroundColor: paymentMethod === "CASH" ? "rgba(13, 74, 46, 0.3)" : "transparent",
+                          color: paymentMethod === "CASH" ? "var(--felt-green-light)" : "var(--muted)",
+                          borderRight: "1px solid var(--card-border)",
+                        }}
+                      >
+                        Cash
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentMethod("BANK")}
+                        className="px-3 py-2.5 text-xs font-semibold tracking-wider uppercase cursor-pointer transition-colors"
+                        style={{
+                          backgroundColor: paymentMethod === "BANK" ? "rgba(201, 168, 76, 0.15)" : "transparent",
+                          color: paymentMethod === "BANK" ? "var(--accent-gold)" : "var(--muted)",
+                        }}
+                      >
+                        Bank
+                      </button>
+                    </div>
                   </div>
                   <button
                     onClick={submitTransaction}

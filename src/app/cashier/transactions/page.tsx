@@ -7,6 +7,7 @@ interface TxRecord {
   type: string;
   amount: number;
   notes: string | null;
+  paymentMethod: string | null;
   createdAt: string;
   player: { id: string; firstName: string; lastName: string };
   user: { id: string; name: string };
@@ -152,15 +153,16 @@ export default function TransactionsPage() {
               <th className="text-left px-5 py-3 text-[10px] font-semibold tracking-wider uppercase text-muted">Player</th>
               <th className="text-left px-5 py-3 text-[10px] font-semibold tracking-wider uppercase text-muted">Type</th>
               <th className="text-right px-5 py-3 text-[10px] font-semibold tracking-wider uppercase text-muted">Amount</th>
+              <th className="text-left px-5 py-3 text-[10px] font-semibold tracking-wider uppercase text-muted">Payment</th>
               <th className="text-left px-5 py-3 text-[10px] font-semibold tracking-wider uppercase text-muted">Notes</th>
               <th className="text-left px-5 py-3 text-[10px] font-semibold tracking-wider uppercase text-muted">Cashier</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="px-5 py-8 text-center text-muted">Loading...</td></tr>
+              <tr><td colSpan={7} className="px-5 py-8 text-center text-muted">Loading...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={6} className="px-5 py-8 text-center text-muted">No transactions found</td></tr>
+              <tr><td colSpan={7} className="px-5 py-8 text-center text-muted">No transactions found</td></tr>
             ) : (
               filtered.map(tx => (
                 <tr key={tx.id} className="border-b border-card-border/50 hover:bg-card-border/20 transition-colors">
@@ -180,6 +182,9 @@ export default function TransactionsPage() {
                   <td className="px-5 py-3 text-right font-bold" style={{ color: typeColor(tx.type) }}>
                     {tx.type === "CASH_OUT" || tx.type === "WITHDRAWAL" || tx.type === "RAKEBACK_PAYOUT" ? "-" : "+"}
                     ${tx.amount.toFixed(2)}
+                  </td>
+                  <td className="px-5 py-3 text-xs text-muted">
+                    {tx.paymentMethod === "BANK" ? "Bank" : "Cash"}
                   </td>
                   <td className="px-5 py-3 text-muted text-xs max-w-[200px] truncate">{tx.notes || "—"}</td>
                   <td className="px-5 py-3 text-muted text-xs">{tx.user.name}</td>

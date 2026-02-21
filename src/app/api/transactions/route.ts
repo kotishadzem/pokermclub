@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   const { error, session } = await requireRole(["ADMIN", "CASHIER"]);
   if (error) return error;
 
-  const { playerId, type, amount, notes } = await req.json();
+  const { playerId, type, amount, notes, paymentMethod } = await req.json();
   if (!playerId || !type || amount === undefined) {
     return NextResponse.json({ error: "playerId, type, and amount required" }, { status: 400 });
   }
@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
       type,
       amount,
       notes: notes || null,
+      paymentMethod: paymentMethod === "BANK" ? "BANK" : "CASH",
       userId: (session!.user as { id: string }).id,
     },
     include: {

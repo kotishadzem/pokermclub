@@ -163,7 +163,7 @@ pokemclub/
 - **TableSession** — Active table session with assigned dealer
 - **TableSeat** — Player seated at a table during a session
 - **WaitingList** — Queue for tables
-- **Transaction** — All financial operations (buy-in, cash-out, deposit, withdrawal, rakeback payout)
+- **Transaction** — All financial operations (buy-in, cash-out, deposit, withdrawal, rakeback payout). Includes `paymentMethod` (CASH/BANK).
 - **RakeRecord** — Rake and tips collected per pot per session (fields: potAmount, rakeAmount, tipAmount)
 
 ### Key Relationships
