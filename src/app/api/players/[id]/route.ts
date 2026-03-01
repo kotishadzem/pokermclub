@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/api-auth";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const { error } = await requireRole(["ADMIN", "PITBOSS", "CASHIER", "DEALER"]);
+  const { error } = await requireRole(["ADMIN", "PITBOSS", "CASHIER", "DEALER", "REGISTRATOR"]);
   if (error) return error;
 
   const { id } = await params;

@@ -3,7 +3,7 @@ import { requireRole } from "@/lib/api-auth";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
-  const { error } = await requireRole(["ADMIN", "PITBOSS", "CASHIER"]);
+  const { error } = await requireRole(["ADMIN", "PITBOSS", "CASHIER", "REGISTRATOR"]);
   if (error) return error;
 
   const search = req.nextUrl.searchParams.get("search") || "";
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { error } = await requireRole(["ADMIN", "PITBOSS", "CASHIER"]);
+  const { error } = await requireRole(["ADMIN", "PITBOSS", "CASHIER", "REGISTRATOR"]);
   if (error) return error;
 
   const body = await req.json();

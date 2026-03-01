@@ -1,18 +1,76 @@
-# CLAUDE.md
+# \# Tech Stack
 
-1. First think through the problem, read the codebase for relevant files.
-2. Before you make any major changes, check in with me and I will verify the plan.
-3. Please every step of the way just give me a high level explanation of what changes you made.
-4. Make every task and code change you do as simple as possible. We want to avoid making any massive or complex changes. Every change should impact as little code as possible. Everything is about simplicity.
-5. Maintain a documentation file that describes how the architecture of the app works inside and out.
-6. Never speculate about code you have not opened. If the user references a specific file, you MUST read the file before answering. Make sure to investigate and read relevant files BEFORE answering questions about the codebase. Never make any claims about code before investigating unless you are certain of the correct answer - give grounded and hallucination-free answers.
+# 
 
-## Project Rules
+# \- Next.js, PostgreSQL.
 
-1. Tech stack: Next.js, PostgreSQL. Docker containerized everything.
-2. Always test everything you've done.
-3. For frontend always use the frontend-design skill.
-4. Use context7 whenever you need.
-5. Always create/update/use documentation files.
-6. Always test frontend with browser. At least, logins and main processes.
-7. Always push to remote without asking for permission.
+# \- Everything is Docker-containerized except Next.js — runs locally for fast iteration without rebuilding containers on every change.
+
+# 
+
+# \# Rules
+
+# 
+
+# \- Think first, read relevant files before answering. Never speculate about code you haven't opened.
+
+# \- If a file is referenced, read it before responding. Investigate before answering — no hallucinations.
+
+# \- Give a high-level explanation of changes at every step.
+
+# \- Commit and push whenever you see fit — no need to wait for approval.
+
+# 
+
+# \# Planning
+
+# 
+
+# \- Maintain a `plan/` folder in the project root.
+
+# \- Create and update plan files there for every feature or task.
+
+# \- Plans persist across sessions — always check `plan/` before starting work.
+
+# 
+
+# \# Documentation
+
+# 
+
+# \- Maintain a `docs/` folder in the project root.
+
+# \- Create or update doc files on every feature addition or update.
+
+# \- Keep an architecture doc describing how the app works inside and out.
+
+# 
+
+# \# Testing
+
+# 
+
+# \- Test every added feature.
+
+# \- After medium+ features, test in browser — logins and main user paths.
+
+# 
+
+# \# Docker
+
+# 
+
+# \- Always rebuild containers with `--no-cache` when changing anything container-based.
+
+# 
+
+# \# Tools
+
+# 
+
+# \- For any frontend work, always use the `frontend-design` skill.
+
+# \- Always use Context7 MCP whenever needed.
+
+
+

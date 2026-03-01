@@ -7,6 +7,7 @@ const roleRoutes: Record<string, string[]> = {
   PITBOSS: ["/pitboss", "/players"],
   CASHIER: ["/cashier", "/players"],
   DEALER: ["/dealer"],
+  REGISTRATOR: ["/registrator", "/players"],
 };
 
 const roleDashboard: Record<string, string> = {
@@ -14,6 +15,7 @@ const roleDashboard: Record<string, string> = {
   PITBOSS: "/pitboss/floor-plan",
   CASHIER: "/cashier/dashboard",
   DEALER: "/dealer/table",
+  REGISTRATOR: "/registrator/dashboard",
 };
 
 export async function middleware(req: NextRequest) {

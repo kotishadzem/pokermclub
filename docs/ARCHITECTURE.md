@@ -51,6 +51,8 @@ pokemclub/
 │   │   │   └── reports/        # Daily financial reports
 │   │   ├── dealer/             # Dealer role pages
 │   │   │   └── table/          # Assigned table + rake recording
+│   │   ├── registrator/        # Registrator role pages
+│   │   │   └── dashboard/      # Room check-in/check-out
 │   │   ├── players/            # Shared player pages
 │   │   │   ├── list/           # Player list with search/filter
 │   │   │   ├── register/       # Player registration form
@@ -70,6 +72,7 @@ pokemclub/
 │   │       ├── bank-accounts/  # Bank account CRUD (soft-delete)
 │   │       ├── opening-balances/# Opening balance GET + upsert
 │   │       ├── player-statuses/# Player status CRUD
+│   │       ├── room-visits/   # Room visit check-in/check-out
 │   │       └── upload/         # File upload (player photos)
 │   ├── components/
 │   │   ├── providers.tsx       # SessionProvider wrapper
@@ -95,6 +98,7 @@ pokemclub/
 | Pit Boss | `/pitboss/*`, `/players/*` | Floor control, tables, waiting list, player placement |
 | Cashier | `/cashier/*`, `/players/*` | Financial operations, buy-in/cash-out, transaction history, reports |
 | Dealer | `/dealer/*` | View assigned table, record rake per pot |
+| Registrator | `/registrator/*`, `/players/*` | Player check-in/check-out, room occupancy tracking, player registration |
 | Player | N/A (no login) | Registered by staff, profile managed by staff |
 
 ## Authentication Flow
@@ -160,6 +164,11 @@ pokemclub/
 - `PUT/DELETE /api/bank-accounts/[id]` — Update/deactivate bank account
 - `GET/POST /api/player-statuses` — List/create player statuses
 
+### Room Visits
+- `GET /api/room-visits` — Today's visits + inRoom count (ADMIN, REGISTRATOR)
+- `POST /api/room-visits` — Check-in player: `{ playerId, checkedIn? }` (ADMIN, REGISTRATOR). Optional `checkedIn` ISO datetime overrides default `now()`.
+- `PATCH /api/room-visits` — Check-out: `{ visitId, checkedOut? }` (ADMIN, REGISTRATOR). Optional `checkedOut` ISO datetime overrides default `now()`.
+
 ### Dealers
 - `GET /api/dealers` — List active dealers (for assignment dropdown)
 
@@ -183,18 +192,21 @@ pokemclub/
 - **OpeningBalance** — Starting balance per channel per date. Channel is `"CASH"`, `"DEPOSITS"`, or a bank account ID. Unique on `[date, channel]`. Used for balance checks on outgoing transactions and displayed on dashboard/reports.
 - **RakeRecord** — Rake and tips collected per pot per session (fields: potAmount, rakeAmount, tipAmount)
 - **TipCollection** — Physical tip cash received by cashier from dealer (fields: tableId, amount, notes, userId)
+- **RoomVisit** — Player room check-in/check-out tracking (fields: playerId, userId, checkedIn, checkedOut)
 
 ### Key Relationships
 
 ```
 User (staff) ──┬── TableSession (as dealer)
                ├── Transaction (recorded by)
-               └── OpeningBalance (set by)
+               ├── OpeningBalance (set by)
+               └── RoomVisit (checked in by)
 
 Player ──┬── TableSeat (seated at)
          ├── WaitingList (queued for)
          ├── Transaction (financial ops)
-         └── RakeRecord (rake attributed to)
+         ├── RakeRecord (rake attributed to)
+         └── RoomVisit (room check-in/out)
 
 Table ──┬── TableSession (active session)
         ├── WaitingList (queue)
@@ -228,6 +240,7 @@ docker compose exec app npm run seed            # Seed data
 8. **Admin Dashboard + Dealer Assignment + Real-time** ✅ — Live stats & activity feed, dealer dropdown on floor plan, version-counter polling (3-10s intervals)
 9. **Opening Balances** ✅ — Per-channel daily opening balances (Cash, bank accounts, Deposits), balance validation on outgoing transactions, OPENING/IN/OUT/BALANCE channel cards on dashboard and reports
 10. **Tip Collections** ✅ — Cashier records physical tip cash received from dealers per table. Dashboard shows summary total (Tips Collected card alongside Rake and Total Balance). Tip collection history is displayed on the Transactions page. Reports include `totalTipsCollected`.
+11. **Registrator Role** ✅ — Room visit tracking (check-in/check-out) via modal dialogs with editable datetime pickers, player registration access, live room occupancy counter with 5s polling.
 
 ## Real-time Update System
 
@@ -243,4 +256,5 @@ Uses lightweight version-counter polling instead of WebSockets:
 | Dealer Table | 3s | Assigned table + seats + rake |
 | Waiting List | 5s | Entries + tables |
 | Cashier Dashboard | 5s | Daily transaction report + tips report |
+| Registrator Dashboard | 5s | Room visits (check-in/out) |
 | Admin Dashboard | 10s | Stats + recent activity |

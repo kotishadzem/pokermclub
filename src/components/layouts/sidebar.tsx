@@ -38,6 +38,10 @@ const NAV_CONFIG: Record<string, NavItem[]> = {
   DEALER: [
     { label: "My Table", href: "/dealer/table", icon: "▣" },
   ],
+  REGISTRATOR: [
+    { label: "Dashboard", href: "/registrator/dashboard", icon: "◈" },
+    { label: "Players", href: "/players/list", icon: "♟" },
+  ],
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -45,6 +49,7 @@ const ROLE_LABELS: Record<string, string> = {
   PITBOSS: "Pit Boss",
   CASHIER: "Cashier",
   DEALER: "Dealer",
+  REGISTRATOR: "Registrator",
 };
 
 export function Sidebar({ role }: { role: string }) {

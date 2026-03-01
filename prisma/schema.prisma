@@ -13,6 +13,7 @@ enum Role {
   PITBOSS
   CASHIER
   DEALER
+  REGISTRATOR
 }
 
 model User {
@@ -29,6 +30,7 @@ model User {
   transactions    Transaction[]
   openingBalances OpeningBalance[]
   tipCollections  TipCollection[]
+  roomVisits      RoomVisit[]
 }
 
 // ── Players ──
@@ -59,6 +61,7 @@ model Player {
   waitingList   WaitingList[]
   tableSeats    TableSeat[]
   rakeRecords   RakeRecord[]
+  roomVisits    RoomVisit[]
 }
 
 // ── Game Configuration ──
@@ -211,4 +214,15 @@ model RakeRecord {
   rakeAmount     Float
   tipAmount      Float        @default(0)
   createdAt      DateTime     @default(now())
+}
+
+// ── Room Visits (Registrator) ──
+model RoomVisit {
+  id         String    @id @default(cuid())
+  playerId   String
+  player     Player    @relation(fields: [playerId], references: [id])
+  userId     String
+  user       User      @relation(fields: [userId], references: [id])
+  checkedIn  DateTime  @default(now())
+  checkedOut DateTime?
 }
