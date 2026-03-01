@@ -41,6 +41,7 @@ export default function RegistratorDashboard() {
 
   // Check-out modal state
   const [checkOutOpen, setCheckOutOpen] = useState(false);
+  const [coSearch, setCoSearch] = useState("");
   const [coSelected, setCoSelected] = useState<RoomVisit | null>(null);
   const [coDatetime, setCoDatetime] = useState(getNowLocal);
 
@@ -89,6 +90,7 @@ export default function RegistratorDashboard() {
   }
 
   function openCheckOut() {
+    setCoSearch("");
     setCoSelected(null);
     setCoDatetime(getNowLocal());
     setCheckOutOpen(true);
@@ -446,6 +448,20 @@ export default function RegistratorDashboard() {
               Check Out Player
             </h3>
 
+            {/* Search */}
+            <input
+              type="text"
+              value={coSearch}
+              onChange={(e) => { setCoSearch(e.target.value); setCoSelected(null); }}
+              placeholder="Search player..."
+              className="w-full rounded-lg border px-4 py-3 text-sm outline-none transition-colors mb-3"
+              style={{
+                borderColor: "var(--card-border)",
+                background: "var(--background)",
+                color: "var(--foreground)",
+              }}
+            />
+
             {/* Player list */}
             <div
               className="max-h-64 overflow-y-auto space-y-1 rounded-lg"
@@ -456,7 +472,15 @@ export default function RegistratorDashboard() {
                   No players in room
                 </p>
               ) : (
-                activeVisits.map((visit) => {
+                activeVisits.filter((v) => {
+                  if (!coSearch.trim()) return true;
+                  const q = coSearch.toLowerCase();
+                  return (
+                    v.player.firstName.toLowerCase().includes(q) ||
+                    v.player.lastName.toLowerCase().includes(q) ||
+                    `${v.player.firstName} ${v.player.lastName}`.toLowerCase().includes(q)
+                  );
+                }).map((visit) => {
                   const selected = coSelected?.id === visit.id;
                   return (
                     <button
