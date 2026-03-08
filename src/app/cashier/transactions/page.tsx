@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useCurrency } from "@/lib/currency";
 
 interface TxRecord {
@@ -385,8 +386,8 @@ export default function TransactionsPage() {
         </div>
       )}
 
-      {/* Edit Transaction Modal */}
-      {editModalOpen && editTx && (
+      {/* Edit Transaction Modal — portaled to body to escape transform containing block */}
+      {editModalOpen && editTx && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onMouseDown={(e) => { if (e.target === e.currentTarget) { setEditModalOpen(false); setEditTx(null); } }}>
           <div className="w-full max-w-lg rounded-xl border border-card-border bg-card-bg shadow-2xl" style={{ animation: "floatUp 0.2s ease-out" }}>
             <div className="border-b border-card-border px-6 py-4 flex items-center justify-between">
@@ -547,7 +548,8 @@ export default function TransactionsPage() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Recent Rake */}
