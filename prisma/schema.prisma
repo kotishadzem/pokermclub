@@ -250,6 +250,17 @@ model RakeRecord {
   createdAt      DateTime     @default(now())
 }
 
+// ── Chips Directory ──
+model Chip {
+  id           String   @id @default(cuid())
+  denomination Float
+  quantity     Int      @default(0)
+  color        String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 // ── Settings (key-value) ──
 model Setting {
   key       String   @id
