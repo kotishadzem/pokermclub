@@ -19,6 +19,22 @@ interface TxRecord {
   user: { id: string; name: string };
 }
 
+interface CurrencyOption {
+  id: string;
+  code: string;
+  name: string;
+  symbol: string;
+  exchangeRate: number;
+  isBase: boolean;
+  active: boolean;
+}
+
+interface BankAccountOption {
+  id: string;
+  name: string;
+  active: boolean;
+}
+
 interface TipCollectionRecord {
   id: string;
   tableId: string;
@@ -62,6 +78,14 @@ const TYPE_OPTIONS = [
   { value: "RAKEBACK_PAYOUT", label: "Rakeback Payout" },
 ];
 
+const EDIT_TYPE_OPTIONS = [
+  { value: "BUY_IN", label: "Buy-in" },
+  { value: "CASH_OUT", label: "Cash-out" },
+  { value: "DEPOSIT", label: "Deposit" },
+  { value: "WITHDRAWAL", label: "Withdrawal" },
+  { value: "RAKEBACK_PAYOUT", label: "Rakeback Payout" },
+];
+
 function typeColor(type: string): string {
   if (type === "BUY_IN" || type === "DEPOSIT") return "var(--felt-green-light)";
   if (type === "CASH_OUT" || type === "WITHDRAWAL") return "var(--danger)";
@@ -78,6 +102,27 @@ function formatType(type: string): string {
   return type.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 }
 
+function Toast({ message, type, onClose }: { message: string; type: "success" | "error"; onClose: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onClose, 3000);
+    return () => clearTimeout(t);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed top-6 right-6 z-50 rounded-lg border px-5 py-3 text-sm font-medium shadow-xl backdrop-blur-sm"
+      style={{
+        animation: "floatUp 0.3s ease-out",
+        borderColor: type === "success" ? "rgba(26, 107, 69, 0.5)" : "rgba(199, 69, 69, 0.5)",
+        backgroundColor: type === "success" ? "rgba(13, 74, 46, 0.9)" : "rgba(120, 30, 30, 0.9)",
+        color: "var(--foreground)",
+      }}
+    >
+      {message}
+    </div>
+  );
+}
+
 export default function TransactionsPage() {
   const { formatMoney } = useCurrency();
   const [transactions, setTransactions] = useState<TxRecord[]>([]);
@@ -89,6 +134,15 @@ export default function TransactionsPage() {
   const [limit, setLimit] = useState(50);
   const [tipsReport, setTipsReport] = useState<TipsReport | null>(null);
   const [rakeReport, setRakeReport] = useState<RakeReport | null>(null);
+
+  // Edit modal state
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editTx, setEditTx] = useState<TxRecord | null>(null);
+  const [editForm, setEditForm] = useState({ type: "", amount: "", currencyId: "", paymentMethod: "CASH", bankAccountId: "", notes: "" });
+  const [currencies, setCurrencies] = useState<CurrencyOption[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<BankAccountOption[]>([]);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   useEffect(() => {
     fetch("/api/tips").then(r => r.json()).then(setTipsReport).catch(() => {});
@@ -109,6 +163,61 @@ export default function TransactionsPage() {
 
   useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
 
+  function openEditModal(tx: TxRecord) {
+    setEditTx(tx);
+    setEditForm({
+      type: tx.type,
+      amount: tx.amount.toString(),
+      currencyId: tx.currency?.id || "",
+      paymentMethod: tx.paymentMethod || "CASH",
+      bankAccountId: tx.bankAccount?.id || "",
+      notes: tx.notes || "",
+    });
+    setEditModalOpen(true);
+    // Fetch currencies and bank accounts
+    fetch("/api/currencies").then(r => r.json()).then((list: CurrencyOption[]) => setCurrencies(list.filter(c => c.active))).catch(() => {});
+    fetch("/api/bank-accounts").then(r => r.json()).then((list: BankAccountOption[]) => setBankAccounts(list.filter(b => b.active))).catch(() => {});
+  }
+
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editTx) return;
+    setEditSubmitting(true);
+    try {
+      const res = await fetch(`/api/transactions/${editTx.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: editForm.type,
+          amount: parseFloat(editForm.amount),
+          currencyId: editForm.currencyId || null,
+          paymentMethod: editForm.paymentMethod,
+          bankAccountId: editForm.paymentMethod === "BANK" ? editForm.bankAccountId : null,
+          notes: editForm.notes,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        setToast({ message: err.error || "Failed to update", type: "error" });
+        setEditSubmitting(false);
+        return;
+      }
+      setToast({ message: "Transaction updated", type: "success" });
+      setEditModalOpen(false);
+      setEditTx(null);
+      fetchTransactions();
+    } catch {
+      setToast({ message: "Update failed", type: "error" });
+    }
+    setEditSubmitting(false);
+  }
+
+  // GEL conversion preview
+  const selectedCurrency = currencies.find(c => c.id === editForm.currencyId);
+  const editAmount = parseFloat(editForm.amount) || 0;
+  const gelPreview = selectedCurrency ? editAmount * selectedCurrency.exchangeRate : editAmount;
+  const showGelPreview = selectedCurrency && !selectedCurrency.isBase;
+
   // Client-side player name filter
   const filtered = playerFilter
     ? transactions.filter(t =>
@@ -124,6 +233,8 @@ export default function TransactionsPage() {
 
   return (
     <div style={{ animation: "floatUp 0.5s ease-out forwards" }}>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
       <div className="mb-6">
         <h1 className="text-2xl font-bold tracking-wide" style={{ fontFamily: "var(--font-display)" }}>Transactions</h1>
         <p className="mt-1 text-sm text-muted">{filtered.length} transactions</p>
@@ -205,13 +316,14 @@ export default function TransactionsPage() {
               <th className="text-left px-5 py-3 text-[10px] font-semibold tracking-wider uppercase text-muted">Payment</th>
               <th className="text-left px-5 py-3 text-[10px] font-semibold tracking-wider uppercase text-muted">Notes</th>
               <th className="text-left px-5 py-3 text-[10px] font-semibold tracking-wider uppercase text-muted">Cashier</th>
+              <th className="text-center px-3 py-3 text-[10px] font-semibold tracking-wider uppercase text-muted w-16">Edit</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} className="px-5 py-8 text-center text-muted">Loading...</td></tr>
+              <tr><td colSpan={8} className="px-5 py-8 text-center text-muted">Loading...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={7} className="px-5 py-8 text-center text-muted">No transactions found</td></tr>
+              <tr><td colSpan={8} className="px-5 py-8 text-center text-muted">No transactions found</td></tr>
             ) : (
               filtered.map(tx => (
                 <tr key={tx.id} className="border-b border-card-border/50 hover:bg-card-border/20 transition-colors">
@@ -240,8 +352,20 @@ export default function TransactionsPage() {
                   <td className="px-5 py-3 text-xs text-muted">
                     {tx.paymentMethod === "BANK" ? (tx.bankAccount ? `Bank - ${tx.bankAccount.name}` : "Bank") : "Cash"}
                   </td>
-                  <td className="px-5 py-3 text-muted text-xs max-w-[200px] truncate">{tx.notes || "—"}</td>
+                  <td className="px-5 py-3 text-muted text-xs max-w-[200px] truncate">{tx.notes || "\u2014"}</td>
                   <td className="px-5 py-3 text-muted text-xs">{tx.user.name}</td>
+                  <td className="px-3 py-3 text-center">
+                    <button
+                      onClick={() => openEditModal(tx)}
+                      className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-card-border/50 text-muted hover:text-accent-gold hover:border-accent-gold/30 transition-all cursor-pointer"
+                      title="Edit transaction"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                        <path d="m15 5 4 4" />
+                      </svg>
+                    </button>
+                  </td>
                 </tr>
               ))
             )}
@@ -258,6 +382,171 @@ export default function TransactionsPage() {
           >
             Load More
           </button>
+        </div>
+      )}
+
+      {/* Edit Transaction Modal */}
+      {editModalOpen && editTx && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onMouseDown={(e) => { if (e.target === e.currentTarget) { setEditModalOpen(false); setEditTx(null); } }}>
+          <div className="w-full max-w-lg rounded-xl border border-card-border bg-card-bg shadow-2xl" style={{ animation: "floatUp 0.2s ease-out" }}>
+            <div className="border-b border-card-border px-6 py-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold tracking-wide" style={{ fontFamily: "var(--font-display)", color: "var(--accent-gold)" }}>
+                  Edit Transaction
+                </h2>
+                <p className="text-xs text-muted mt-0.5">
+                  {editTx.player.firstName} {editTx.player.lastName} &middot; {new Date(editTx.createdAt).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+            <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
+              {/* Type & Amount row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium tracking-wider uppercase text-muted mb-1.5">Type</label>
+                  <select
+                    value={editForm.type}
+                    onChange={e => setEditForm({ ...editForm, type: e.target.value })}
+                    required
+                    className="w-full rounded-lg border border-card-border bg-card-bg px-4 py-2.5 text-sm outline-none cursor-pointer focus:border-accent-gold/50"
+                    style={{ color: "var(--foreground)" }}
+                  >
+                    {EDIT_TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium tracking-wider uppercase text-muted mb-1.5">Amount</label>
+                  <input
+                    type="number"
+                    value={editForm.amount}
+                    onChange={e => setEditForm({ ...editForm, amount: e.target.value })}
+                    required
+                    min="0.01"
+                    step="0.01"
+                    className="w-full rounded-lg border border-card-border bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent-gold/50"
+                    style={{ color: "var(--foreground)" }}
+                  />
+                </div>
+              </div>
+
+              {/* Currency */}
+              <div>
+                <label className="block text-xs font-medium tracking-wider uppercase text-muted mb-1.5">Currency</label>
+                <select
+                  value={editForm.currencyId}
+                  onChange={e => setEditForm({ ...editForm, currencyId: e.target.value })}
+                  className="w-full rounded-lg border border-card-border bg-card-bg px-4 py-2.5 text-sm outline-none cursor-pointer focus:border-accent-gold/50"
+                  style={{ color: "var(--foreground)" }}
+                >
+                  <option value="">GEL (Base)</option>
+                  {currencies.filter(c => !c.isBase).map(c => (
+                    <option key={c.id} value={c.id}>{c.code} — {c.name} (1 = {c.exchangeRate} GEL)</option>
+                  ))}
+                </select>
+                {showGelPreview && editAmount > 0 && (
+                  <div
+                    className="mt-2 rounded-lg px-3 py-2 text-xs"
+                    style={{ backgroundColor: "rgba(201, 168, 76, 0.08)", border: "1px solid rgba(201, 168, 76, 0.2)" }}
+                  >
+                    <span className="text-muted">{selectedCurrency.symbol} {editAmount.toFixed(2)}</span>
+                    <span className="text-muted mx-1.5">=</span>
+                    <span className="font-semibold" style={{ color: "var(--accent-gold)" }}>GEL {gelPreview.toFixed(2)}</span>
+                    <span className="text-muted ml-1.5 text-[10px]">(rate: {selectedCurrency.exchangeRate})</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Payment Method */}
+              <div>
+                <label className="block text-xs font-medium tracking-wider uppercase text-muted mb-1.5">Payment Method</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditForm({ ...editForm, paymentMethod: "CASH", bankAccountId: "" })}
+                    className="flex-1 rounded-lg py-2 text-sm font-medium tracking-wider uppercase transition-all cursor-pointer"
+                    style={editForm.paymentMethod === "CASH" ? {
+                      background: "rgba(13, 74, 46, 0.25)",
+                      border: "1px solid rgba(26, 107, 69, 0.5)",
+                      color: "var(--felt-green-light)",
+                    } : {
+                      background: "transparent",
+                      border: "1px solid var(--card-border)",
+                      color: "var(--muted)",
+                    }}
+                  >
+                    Cash
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditForm({ ...editForm, paymentMethod: "BANK" })}
+                    className="flex-1 rounded-lg py-2 text-sm font-medium tracking-wider uppercase transition-all cursor-pointer"
+                    style={editForm.paymentMethod === "BANK" ? {
+                      background: "rgba(13, 74, 46, 0.25)",
+                      border: "1px solid rgba(26, 107, 69, 0.5)",
+                      color: "var(--felt-green-light)",
+                    } : {
+                      background: "transparent",
+                      border: "1px solid var(--card-border)",
+                      color: "var(--muted)",
+                    }}
+                  >
+                    Bank
+                  </button>
+                </div>
+              </div>
+
+              {/* Bank Account (conditional) */}
+              {editForm.paymentMethod === "BANK" && (
+                <div>
+                  <label className="block text-xs font-medium tracking-wider uppercase text-muted mb-1.5">Bank Account</label>
+                  <select
+                    value={editForm.bankAccountId}
+                    onChange={e => setEditForm({ ...editForm, bankAccountId: e.target.value })}
+                    required
+                    className="w-full rounded-lg border border-card-border bg-card-bg px-4 py-2.5 text-sm outline-none cursor-pointer focus:border-accent-gold/50"
+                    style={{ color: "var(--foreground)" }}
+                  >
+                    <option value="">Select bank account...</option>
+                    {bankAccounts.map(ba => (
+                      <option key={ba.id} value={ba.id}>{ba.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Notes */}
+              <div>
+                <label className="block text-xs font-medium tracking-wider uppercase text-muted mb-1.5">Notes</label>
+                <textarea
+                  value={editForm.notes}
+                  onChange={e => setEditForm({ ...editForm, notes: e.target.value })}
+                  rows={2}
+                  placeholder="Optional notes..."
+                  className="w-full rounded-lg border border-card-border bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent-gold/50 resize-none"
+                  style={{ color: "var(--foreground)" }}
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={editSubmitting}
+                  className="flex-1 rounded-lg py-2.5 text-sm font-semibold tracking-wider uppercase cursor-pointer disabled:opacity-50"
+                  style={{ background: "linear-gradient(135deg, var(--felt-green), var(--felt-green-light))", color: "var(--foreground)" }}
+                >
+                  {editSubmitting ? "Saving..." : "Update"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setEditModalOpen(false); setEditTx(null); }}
+                  className="flex-1 rounded-lg border border-card-border py-2.5 text-sm font-medium tracking-wider uppercase text-muted hover:text-foreground transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
@@ -290,7 +579,7 @@ export default function TransactionsPage() {
                     </td>
                     <td className="px-5 py-3 font-medium" style={{ color: "var(--felt-green-light)" }}>{rc.table.name}</td>
                     <td className="px-5 py-3 text-right font-bold" style={{ color: "var(--felt-green-light)" }}>{formatMoney(rc.amount)}</td>
-                    <td className="px-5 py-3 text-muted text-xs max-w-[200px] truncate">{rc.notes || "—"}</td>
+                    <td className="px-5 py-3 text-muted text-xs max-w-[200px] truncate">{rc.notes || "\u2014"}</td>
                     <td className="px-5 py-3 text-muted text-xs">{rc.user.name}</td>
                   </tr>
                 ))}
@@ -329,7 +618,7 @@ export default function TransactionsPage() {
                     </td>
                     <td className="px-5 py-3 font-medium" style={{ color: "var(--accent-gold)" }}>{tc.table.name}</td>
                     <td className="px-5 py-3 text-right font-bold" style={{ color: "var(--accent-gold)" }}>{formatMoney(tc.amount)}</td>
-                    <td className="px-5 py-3 text-muted text-xs max-w-[200px] truncate">{tc.notes || "—"}</td>
+                    <td className="px-5 py-3 text-muted text-xs max-w-[200px] truncate">{tc.notes || "\u2014"}</td>
                     <td className="px-5 py-3 text-muted text-xs">{tc.user.name}</td>
                   </tr>
                 ))}
