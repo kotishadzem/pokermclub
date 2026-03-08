@@ -48,6 +48,15 @@ interface BankAccountOption {
   name: string;
 }
 
+interface CurrencyOption {
+  id: string;
+  code: string;
+  name: string;
+  symbol: string;
+  exchangeRate: number;
+  isBase: boolean;
+}
+
 interface PlayerOption {
   id: string;
   firstName: string;
@@ -131,6 +140,8 @@ export default function CashierDashboard() {
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "BANK">("CASH");
   const [bankAccountId, setBankAccountId] = useState("");
   const [bankAccounts, setBankAccounts] = useState<BankAccountOption[]>([]);
+  const [currencies, setCurrencies] = useState<CurrencyOption[]>([]);
+  const [selectedCurrencyId, setSelectedCurrencyId] = useState("");
 
   // Tips collection state
   const [tables, setTables] = useState<TableOption[]>([]);
@@ -161,10 +172,15 @@ export default function CashierDashboard() {
 
   useLiveData(fetchReport, 5000);
 
-  // Fetch bank accounts + tables on mount
+  // Fetch bank accounts, tables, currencies on mount
   useEffect(() => {
     fetch("/api/bank-accounts").then(r => r.json()).then(setBankAccounts).catch(() => {});
     fetch("/api/tables").then(r => r.json()).then((data: TableOption[]) => setTables(data)).catch(() => {});
+    fetch("/api/currencies").then(r => r.json()).then((data: CurrencyOption[]) => {
+      setCurrencies(data);
+      const base = data.find(c => c.isBase);
+      if (base) setSelectedCurrencyId(base.id);
+    }).catch(() => {});
   }, []);
 
   // Player search debounce
@@ -197,6 +213,7 @@ export default function CashierDashboard() {
     if (!selectedPlayer || !activeAction || !amount) return;
     setSubmitting(true);
     try {
+      const selectedCurr = currencies.find(c => c.id === selectedCurrencyId);
       const res = await fetch("/api/transactions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -207,6 +224,7 @@ export default function CashierDashboard() {
           notes: notes || null,
           paymentMethod,
           bankAccountId: paymentMethod === "BANK" ? bankAccountId : null,
+          currencyId: selectedCurr && !selectedCurr.isBase ? selectedCurr.id : undefined,
         }),
       });
       if (res.ok) {
@@ -217,6 +235,8 @@ export default function CashierDashboard() {
         setNotes("");
         setPaymentMethod("CASH");
         setBankAccountId("");
+        const base = currencies.find(c => c.isBase);
+        if (base) setSelectedCurrencyId(base.id);
         refreshPlayer();
       } else {
         const err = await res.json();
@@ -485,7 +505,7 @@ export default function CashierDashboard() {
                 return (
                   <button
                     key={type}
-                    onClick={() => { setActiveAction(isActive ? null : type); setAmount(""); setNotes(""); setPaymentMethod("CASH"); setBankAccountId(""); }}
+                    onClick={() => { setActiveAction(isActive ? null : type); setAmount(""); setNotes(""); setPaymentMethod("CASH"); setBankAccountId(""); const base = currencies.find(c => c.isBase); if (base) setSelectedCurrencyId(base.id); }}
                     className="rounded-lg border px-4 py-3 text-sm font-semibold tracking-wider uppercase cursor-pointer transition-all duration-200"
                     style={{
                       borderColor: isActive ? meta.color : meta.borderColor,
@@ -506,7 +526,7 @@ export default function CashierDashboard() {
               <div className="mt-4 pt-4 border-t border-card-border" style={{ animation: "floatUp 0.2s ease-out" }}>
                 <div className="flex gap-3 items-end flex-wrap">
                   <div className="flex-1 min-w-[120px]">
-                    <label className="block text-xs text-muted mb-1">Amount ({currency.symbol})</label>
+                    <label className="block text-xs text-muted mb-1">Amount</label>
                     <input
                       type="number"
                       min={0.01}
@@ -519,6 +539,21 @@ export default function CashierDashboard() {
                       autoFocus
                     />
                   </div>
+                  {currencies.length > 1 && (
+                    <div className="min-w-[100px]">
+                      <label className="block text-xs text-muted mb-1">Currency</label>
+                      <select
+                        value={selectedCurrencyId}
+                        onChange={e => setSelectedCurrencyId(e.target.value)}
+                        className="w-full rounded-lg border border-card-border bg-card-bg px-3 py-2.5 text-sm outline-none cursor-pointer"
+                        style={{ color: "var(--foreground)" }}
+                      >
+                        {currencies.map(c => (
+                          <option key={c.id} value={c.id}>{c.code}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div className="flex-1 min-w-[120px]">
                     <label className="block text-xs text-muted mb-1">Notes (optional)</label>
                     <input
@@ -583,6 +618,18 @@ export default function CashierDashboard() {
                     {submitting ? "..." : "Submit"}
                   </button>
                 </div>
+                {(() => {
+                  const selectedCurr = currencies.find(c => c.id === selectedCurrencyId);
+                  if (selectedCurr && !selectedCurr.isBase && amount && parseFloat(amount) > 0) {
+                    const gelAmount = parseFloat(amount) * selectedCurr.exchangeRate;
+                    return (
+                      <p className="mt-2 text-xs" style={{ color: "var(--accent-gold-dim)" }}>
+                        = {formatMoney(gelAmount)} <span className="text-muted">(rate: {selectedCurr.exchangeRate})</span>
+                      </p>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
             )}
           </div>

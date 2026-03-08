@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
       player: { select: { id: true, firstName: true, lastName: true } },
       user: { select: { id: true, name: true } },
       bankAccount: { select: { id: true, name: true } },
+      currency: { select: { id: true, code: true, symbol: true } },
     },
     orderBy: { createdAt: "desc" },
     take: limit,
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
   const { error, session } = await requireRole(["ADMIN", "CASHIER"]);
   if (error) return error;
 
-  const { playerId, type, amount, notes, paymentMethod, bankAccountId } = await req.json();
+  const { playerId, type, amount, notes, paymentMethod, bankAccountId, currencyId } = await req.json();
   if (!playerId || !type || amount === undefined) {
     return NextResponse.json({ error: "playerId, type, and amount required" }, { status: 400 });
   }
@@ -58,6 +59,23 @@ export async function POST(req: NextRequest) {
   if (paymentMethod === "BANK" && !bankAccountId) {
     return NextResponse.json({ error: "Bank account required for bank payments" }, { status: 400 });
   }
+
+  // Resolve currency and exchange rate
+  let currencyCode = "GEL";
+  let exchangeRate = 1;
+  let resolvedCurrencyId: string | null = null;
+
+  if (currencyId) {
+    const curr = await prisma.currency.findUnique({ where: { id: currencyId } });
+    if (!curr || !curr.active) {
+      return NextResponse.json({ error: "Invalid or inactive currency" }, { status: 400 });
+    }
+    currencyCode = curr.code;
+    exchangeRate = curr.exchangeRate;
+    resolvedCurrencyId = curr.id;
+  }
+
+  const amountInGel = amount * exchangeRate;
 
   // Balance check for outgoing transactions
   if (type === "CASH_OUT" || type === "WITHDRAWAL") {
@@ -89,30 +107,31 @@ export async function POST(req: NextRequest) {
     // Calculate today's in/out for this channel
     const todayTxs = await prisma.transaction.findMany({
       where: { createdAt: { gte: dayStart, lte: dayEnd } },
-      select: { type: true, amount: true, paymentMethod: true, bankAccountId: true },
+      select: { type: true, amount: true, amountInGel: true, paymentMethod: true, bankAccountId: true },
     });
 
     let totalIn = 0;
     let totalOut = 0;
 
     for (const t of todayTxs) {
+      const gelAmount = t.amountInGel ?? t.amount;
       if (channel === "CASH") {
-        if (t.type === "BUY_IN" && t.paymentMethod !== "BANK") totalIn += t.amount;
-        if (t.type === "CASH_OUT" && t.paymentMethod !== "BANK") totalOut += t.amount;
+        if (t.type === "BUY_IN" && t.paymentMethod !== "BANK") totalIn += gelAmount;
+        if (t.type === "CASH_OUT" && t.paymentMethod !== "BANK") totalOut += gelAmount;
       } else if (channel === "DEPOSITS") {
-        if (t.type === "DEPOSIT") totalIn += t.amount;
-        if (t.type === "WITHDRAWAL") totalOut += t.amount;
+        if (t.type === "DEPOSIT") totalIn += gelAmount;
+        if (t.type === "WITHDRAWAL") totalOut += gelAmount;
       } else {
         // Bank account channel
-        if (t.type === "BUY_IN" && t.paymentMethod === "BANK" && t.bankAccountId === channel) totalIn += t.amount;
-        if (t.type === "CASH_OUT" && t.paymentMethod === "BANK" && t.bankAccountId === channel) totalOut += t.amount;
+        if (t.type === "BUY_IN" && t.paymentMethod === "BANK" && t.bankAccountId === channel) totalIn += gelAmount;
+        if (t.type === "CASH_OUT" && t.paymentMethod === "BANK" && t.bankAccountId === channel) totalOut += gelAmount;
       }
     }
 
     const available = openingAmount + totalIn - totalOut;
-    if (available < amount) {
+    if (available < amountInGel) {
       return NextResponse.json(
-        { error: `Insufficient funds in ${channelName}. Available: $${available.toFixed(2)}` },
+        { error: `Insufficient funds in ${channelName}. Available: GEL ${available.toFixed(2)}` },
         { status: 400 }
       );
     }
@@ -126,6 +145,10 @@ export async function POST(req: NextRequest) {
       notes: notes || null,
       paymentMethod: paymentMethod === "BANK" ? "BANK" : "CASH",
       bankAccountId: paymentMethod === "BANK" ? bankAccountId : null,
+      currencyId: resolvedCurrencyId,
+      currencyCode,
+      exchangeRate,
+      amountInGel,
       userId: (session!.user as { id: string }).id,
     },
     include: {

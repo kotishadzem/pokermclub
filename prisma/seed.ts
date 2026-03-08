@@ -46,6 +46,21 @@ async function main() {
     });
   }
 
+  // Default currencies
+  const currencies = [
+    { code: "GEL", name: "Georgian Lari", symbol: "GEL", exchangeRate: 1, isBase: true },
+    { code: "USD", name: "US Dollar", symbol: "$", exchangeRate: 2.7, isBase: false },
+    { code: "EUR", name: "Euro", symbol: "€", exchangeRate: 2.9, isBase: false },
+    { code: "GBP", name: "British Pound", symbol: "£", exchangeRate: 3.4, isBase: false },
+  ];
+  for (const c of currencies) {
+    await prisma.currency.upsert({
+      where: { code: c.code },
+      update: {},
+      create: c,
+    });
+  }
+
   // Default settings
   await prisma.setting.upsert({
     where: { key: "currency" },

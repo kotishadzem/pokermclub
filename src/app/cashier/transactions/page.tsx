@@ -7,6 +7,10 @@ interface TxRecord {
   id: string;
   type: string;
   amount: number;
+  amountInGel: number | null;
+  currencyCode: string;
+  exchangeRate: number;
+  currency: { id: string; code: string; symbol: string } | null;
   notes: string | null;
   paymentMethod: string | null;
   bankAccount: { id: string; name: string } | null;
@@ -113,8 +117,9 @@ export default function TransactionsPage() {
     : transactions;
 
   const totalShown = filtered.reduce((sum, t) => {
-    if (t.type === "BUY_IN" || t.type === "DEPOSIT") return sum + t.amount;
-    return sum - t.amount;
+    const gelAmt = t.amountInGel ?? t.amount;
+    if (t.type === "BUY_IN" || t.type === "DEPOSIT") return sum + gelAmt;
+    return sum - gelAmt;
   }, 0);
 
   return (
@@ -225,7 +230,12 @@ export default function TransactionsPage() {
                   </td>
                   <td className="px-5 py-3 text-right font-bold" style={{ color: typeColor(tx.type) }}>
                     {tx.type === "CASH_OUT" || tx.type === "WITHDRAWAL" || tx.type === "RAKEBACK_PAYOUT" ? "-" : "+"}
-                    {formatMoney(tx.amount)}
+                    {formatMoney(tx.amountInGel ?? tx.amount)}
+                    {tx.currencyCode !== "GEL" && (
+                      <span className="block text-[10px] font-normal text-muted">
+                        {tx.currency?.symbol || tx.currencyCode} {tx.amount.toFixed(2)}
+                      </span>
+                    )}
                   </td>
                   <td className="px-5 py-3 text-xs text-muted">
                     {tx.paymentMethod === "BANK" ? (tx.bankAccount ? `Bank - ${tx.bankAccount.name}` : "Bank") : "Cash"}

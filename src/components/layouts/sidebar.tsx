@@ -22,6 +22,7 @@ const NAV_CONFIG: Record<string, NavItem[]> = {
     { label: "Opening Balances", href: "/admin/opening-balances", icon: "◎" },
     { label: "Rakeback", href: "/admin/rakeback-config", icon: "%" },
     { label: "Players", href: "/players/list", icon: "♟" },
+    { label: "Currencies", href: "/cashier/currencies", icon: "💱" },
     { label: "Settings", href: "/admin/settings", icon: "⚙" },
   ],
   PITBOSS: [
@@ -35,6 +36,7 @@ const NAV_CONFIG: Record<string, NavItem[]> = {
     { label: "Transactions", href: "/cashier/transactions", icon: "⇄" },
     { label: "Reports", href: "/cashier/reports", icon: "▤" },
     { label: "Players", href: "/players/list", icon: "♟" },
+    { label: "Currencies", href: "/cashier/currencies", icon: "💱" },
   ],
   DEALER: [
     { label: "My Table", href: "/dealer/table", icon: "▣" },

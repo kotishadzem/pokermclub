@@ -140,6 +140,21 @@ model WaitingList {
   createdAt  DateTime @default(now())
 }
 
+// ── Currencies ──
+model Currency {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  name         String
+  symbol       String
+  exchangeRate Float    @default(1)
+  isBase       Boolean  @default(false)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  transactions Transaction[]
+}
+
 // ── Bank Accounts ──
 model BankAccount {
   id        String   @id @default(cuid())
@@ -174,6 +189,11 @@ model Transaction {
   paymentMethod PaymentMethod?  @default(CASH)
   bankAccountId String?
   bankAccount   BankAccount?    @relation(fields: [bankAccountId], references: [id])
+  currencyId    String?
+  currency      Currency?       @relation(fields: [currencyId], references: [id])
+  currencyCode  String          @default("GEL")
+  exchangeRate  Float           @default(1)
+  amountInGel   Float?
   userId        String
   user          User            @relation(fields: [userId], references: [id])
   createdAt     DateTime        @default(now())

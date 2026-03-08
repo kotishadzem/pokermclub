@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
       player: { select: { firstName: true, lastName: true } },
       user: { select: { name: true } },
       bankAccount: { select: { id: true, name: true } },
+      currency: { select: { id: true, code: true, symbol: true } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -35,16 +36,17 @@ export async function GET(req: NextRequest) {
   };
 
   for (const t of transactions) {
+    const gelAmount = t.amountInGel ?? t.amount;
     switch (t.type) {
       case "BUY_IN":
-        summary.totalBuyIns += t.amount;
-        if (t.paymentMethod === "BANK") summary.totalBuyInsBank += t.amount;
-        else summary.totalBuyInsCash += t.amount;
+        summary.totalBuyIns += gelAmount;
+        if (t.paymentMethod === "BANK") summary.totalBuyInsBank += gelAmount;
+        else summary.totalBuyInsCash += gelAmount;
         break;
-      case "CASH_OUT": summary.totalCashOuts += t.amount; break;
-      case "DEPOSIT": summary.totalDeposits += t.amount; break;
-      case "WITHDRAWAL": summary.totalWithdrawals += t.amount; break;
-      case "RAKEBACK_PAYOUT": summary.totalRakebackPayouts += t.amount; break;
+      case "CASH_OUT": summary.totalCashOuts += gelAmount; break;
+      case "DEPOSIT": summary.totalDeposits += gelAmount; break;
+      case "WITHDRAWAL": summary.totalWithdrawals += gelAmount; break;
+      case "RAKEBACK_PAYOUT": summary.totalRakebackPayouts += gelAmount; break;
     }
   }
 
@@ -63,15 +65,16 @@ export async function GET(req: NextRequest) {
   const bankChannels: Record<string, { name: string; icon: string; opening: number; in: number; out: number; net: number; balance: number }> = {};
 
   for (const t of transactions) {
+    const gelAmount = t.amountInGel ?? t.amount;
     switch (t.type) {
       case "BUY_IN":
         if (t.paymentMethod === "BANK" && t.bankAccount) {
           if (!bankChannels[t.bankAccount.id]) {
             bankChannels[t.bankAccount.id] = { name: t.bankAccount.name, icon: "bank", opening: obMap[t.bankAccount.id] || 0, in: 0, out: 0, net: 0, balance: 0 };
           }
-          bankChannels[t.bankAccount.id].in += t.amount;
+          bankChannels[t.bankAccount.id].in += gelAmount;
         } else {
-          cashChannel.in += t.amount;
+          cashChannel.in += gelAmount;
         }
         break;
       case "CASH_OUT":
@@ -79,16 +82,16 @@ export async function GET(req: NextRequest) {
           if (!bankChannels[t.bankAccount.id]) {
             bankChannels[t.bankAccount.id] = { name: t.bankAccount.name, icon: "bank", opening: obMap[t.bankAccount.id] || 0, in: 0, out: 0, net: 0, balance: 0 };
           }
-          bankChannels[t.bankAccount.id].out += t.amount;
+          bankChannels[t.bankAccount.id].out += gelAmount;
         } else {
-          cashChannel.out += t.amount;
+          cashChannel.out += gelAmount;
         }
         break;
       case "DEPOSIT":
-        depositChannel.in += t.amount;
+        depositChannel.in += gelAmount;
         break;
       case "WITHDRAWAL":
-        depositChannel.out += t.amount;
+        depositChannel.out += gelAmount;
         break;
     }
   }
