@@ -161,6 +161,16 @@ pokemclub/
 - `GET /api/tips?date=` — Tips report for date (default: today). Returns `{ date, grandTotal, byTable: [{tableId, tableName, total, count}], collections: [...] }`
 - `PUT /api/tips/[id]` — Edit tip collection (amount, tableId, notes). All fields optional, keeps original if omitted.
 
+### Expense Types
+- `GET /api/expense-types` — List active expense types
+- `POST /api/expense-types` — Create expense type. Body: `{ name }`. Reactivates if soft-deleted.
+- `PUT /api/expense-types/[id]` — Rename expense type
+- `DELETE /api/expense-types/[id]` — Soft-delete expense type
+
+### Expenses
+- `GET /api/expenses?date=` — Today's expenses with totals. Returns `{ date, total, expenses: [...] }`
+- `POST /api/expenses` — Record expense. Body: `{ expenseTypeId, amount, paymentMethod, bankAccountId?, notes? }`. Checks channel balance before recording. Expenses reduce channel balances in daily reports.
+
 ### Rakeback
 - `GET /api/rakeback?playerId=` — Calculate rakeback for player(s)
 
@@ -202,6 +212,8 @@ pokemclub/
 - **RakeRecord** — Rake and tips collected per pot per session (fields: potAmount, rakeAmount, tipAmount)
 - **TipCollection** — Physical tip cash received by cashier from dealer (fields: tableId, amount, notes, userId)
 - **RoomVisit** — Player room check-in/check-out tracking (fields: playerId, userId, checkedIn, checkedOut)
+- **ExpenseType** — Configurable expense categories (name, active flag for soft-delete)
+- **Expense** — Recorded cash outflows (expenseTypeId, amount, paymentMethod, bankAccountId, notes, userId). Reduces channel balances in daily reports.
 
 ### Key Relationships
 
