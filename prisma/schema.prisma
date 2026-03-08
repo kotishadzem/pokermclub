@@ -32,6 +32,7 @@ model User {
   tipCollections  TipCollection[]
   rakeCollections RakeCollection[]
   roomVisits      RoomVisit[]
+  expenses        Expense[]
 }
 
 // ── Players ──
@@ -163,6 +164,7 @@ model BankAccount {
   createdAt DateTime @default(now())
 
   transactions Transaction[]
+  expenses     Expense[]
 }
 
 // ── Transactions ──
@@ -260,6 +262,31 @@ model Chip {
   active       Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+// ── Expense Types ──
+model ExpenseType {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  expenses Expense[]
+}
+
+// ── Expenses ──
+model Expense {
+  id            String        @id @default(cuid())
+  expenseTypeId String
+  expenseType   ExpenseType   @relation(fields: [expenseTypeId], references: [id])
+  amount        Float
+  paymentMethod PaymentMethod @default(CASH)
+  bankAccountId String?
+  bankAccount   BankAccount?  @relation(fields: [bankAccountId], references: [id])
+  notes         String?
+  userId        String
+  user          User          @relation(fields: [userId], references: [id])
+  createdAt     DateTime      @default(now())
 }
 
 // ── Settings (key-value) ──

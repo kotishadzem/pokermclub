@@ -48,6 +48,28 @@ interface BankAccountOption {
   name: string;
 }
 
+interface ExpenseTypeOption {
+  id: string;
+  name: string;
+}
+
+interface ExpenseRecord {
+  id: string;
+  amount: number;
+  paymentMethod: string;
+  notes: string | null;
+  createdAt: string;
+  expenseType: { id: string; name: string };
+  bankAccount: { id: string; name: string } | null;
+  user: { name: string };
+}
+
+interface ExpensesReport {
+  date: string;
+  total: number;
+  expenses: ExpenseRecord[];
+}
+
 interface CurrencyOption {
   id: string;
   code: string;
@@ -174,16 +196,28 @@ export default function CashierDashboard() {
   const [rakeNotes, setRakeNotes] = useState("");
   const [submittingRake, setSubmittingRake] = useState(false);
 
+  // Expense state
+  const [expenseTypes, setExpenseTypes] = useState<ExpenseTypeOption[]>([]);
+  const [expensesReport, setExpensesReport] = useState<ExpensesReport | null>(null);
+  const [expenseTypeId, setExpenseTypeId] = useState("");
+  const [expenseAmount, setExpenseAmount] = useState("");
+  const [expensePaymentMethod, setExpensePaymentMethod] = useState<"CASH" | "BANK">("CASH");
+  const [expenseBankAccountId, setExpenseBankAccountId] = useState("");
+  const [expenseNotes, setExpenseNotes] = useState("");
+  const [submittingExpense, setSubmittingExpense] = useState(false);
+
   // Fetch today's summary + tips (live-polled)
   const fetchReport = useCallback(async () => {
-    const [reportRes, tipsRes, rakeRes] = await Promise.all([
+    const [reportRes, tipsRes, rakeRes, expensesRes] = await Promise.all([
       fetch("/api/transactions/reports"),
       fetch("/api/tips"),
       fetch("/api/rake-collections"),
+      fetch("/api/expenses"),
     ]);
     setDayReport(await reportRes.json());
     setTipsReport(await tipsRes.json());
     setRakeReport(await rakeRes.json());
+    setExpensesReport(await expensesRes.json());
   }, []);
 
   useLiveData(fetchReport, 5000);
@@ -193,6 +227,7 @@ export default function CashierDashboard() {
     fetch("/api/bank-accounts").then(r => r.json()).then(setBankAccounts).catch(() => {});
     fetch("/api/tables").then(r => r.json()).then((data: TableOption[]) => setTables(data)).catch(() => {});
     fetch("/api/chips").then(r => r.json()).then((data: ChipOption[]) => setChips(data)).catch(() => {});
+    fetch("/api/expense-types").then(r => r.json()).then((data: ExpenseTypeOption[]) => setExpenseTypes(data)).catch(() => {});
     fetch("/api/currencies").then(r => r.json()).then((data: CurrencyOption[]) => {
       setCurrencies(data);
       const base = data.find(c => c.isBase);
@@ -347,6 +382,40 @@ export default function CashierDashboard() {
       setToast({ message: "Rake collection failed", type: "error" });
     }
     setSubmittingRake(false);
+  }
+
+  async function submitExpense() {
+    if (!expenseTypeId || !expenseAmount || parseFloat(expenseAmount) <= 0) return;
+    setSubmittingExpense(true);
+    try {
+      const res = await fetch("/api/expenses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          expenseTypeId,
+          amount: parseFloat(expenseAmount),
+          paymentMethod: expensePaymentMethod,
+          bankAccountId: expensePaymentMethod === "BANK" ? expenseBankAccountId : null,
+          notes: expenseNotes || null,
+        }),
+      });
+      if (res.ok) {
+        const typeName = expenseTypes.find(t => t.id === expenseTypeId)?.name || "Expense";
+        setToast({ message: `${typeName}: ${formatMoney(parseFloat(expenseAmount))} recorded`, type: "success" });
+        setExpenseAmount("");
+        setExpenseNotes("");
+        setExpensePaymentMethod("CASH");
+        setExpenseBankAccountId("");
+        fetch("/api/expenses").then(r => r.json()).then(setExpensesReport).catch(() => {});
+        fetch("/api/transactions/reports").then(r => r.json()).then(setDayReport).catch(() => {});
+      } else {
+        const err = await res.json();
+        setToast({ message: err.error || "Expense recording failed", type: "error" });
+      }
+    } catch {
+      setToast({ message: "Expense recording failed", type: "error" });
+    }
+    setSubmittingExpense(false);
   }
 
   // Calculate balance from transactions
@@ -904,6 +973,138 @@ export default function CashierDashboard() {
             >
               {submittingTip ? "..." : "Collect"}
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Record Expense Section ── */}
+      <div className="mt-6" style={{ animation: "floatUp 0.5s ease-out" }}>
+        <div className="rounded-xl border border-card-border bg-card-bg/60 p-5">
+          <h3 className="text-xs font-semibold tracking-wider uppercase text-muted mb-3">Record Expense</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="block text-xs text-muted mb-1">Expense Type</label>
+                <select
+                  value={expenseTypeId}
+                  onChange={e => setExpenseTypeId(e.target.value)}
+                  className="w-full rounded-lg border border-card-border bg-card-bg px-3 py-2.5 text-sm outline-none cursor-pointer"
+                  style={{ color: "var(--foreground)" }}
+                >
+                  <option value="">Select type...</option>
+                  {expenseTypes.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1">Amount ({currency.symbol})</label>
+                <input
+                  type="number"
+                  min={0.01}
+                  step="0.01"
+                  value={expenseAmount}
+                  onChange={e => setExpenseAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full rounded-lg border border-card-border bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent-gold/50"
+                  style={{ color: "var(--foreground)" }}
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-muted mb-1">Payment Method</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setExpensePaymentMethod("CASH"); setExpenseBankAccountId(""); }}
+                    className="flex-1 rounded-lg border px-3 py-2 text-xs font-semibold tracking-wider uppercase cursor-pointer transition-all"
+                    style={{
+                      borderColor: expensePaymentMethod === "CASH" ? "var(--felt-green-light)" : "var(--card-border)",
+                      backgroundColor: expensePaymentMethod === "CASH" ? "rgba(13, 74, 46, 0.2)" : "transparent",
+                      color: expensePaymentMethod === "CASH" ? "var(--felt-green-light)" : "var(--muted)",
+                    }}
+                  >
+                    Cash
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setExpensePaymentMethod("BANK")}
+                    className="flex-1 rounded-lg border px-3 py-2 text-xs font-semibold tracking-wider uppercase cursor-pointer transition-all"
+                    style={{
+                      borderColor: expensePaymentMethod === "BANK" ? "var(--accent-gold)" : "var(--card-border)",
+                      backgroundColor: expensePaymentMethod === "BANK" ? "rgba(201, 168, 76, 0.1)" : "transparent",
+                      color: expensePaymentMethod === "BANK" ? "var(--accent-gold)" : "var(--muted)",
+                    }}
+                  >
+                    Bank
+                  </button>
+                </div>
+              </div>
+              {expensePaymentMethod === "BANK" && (
+                <div>
+                  <label className="block text-xs text-muted mb-1">Bank Account</label>
+                  <select
+                    value={expenseBankAccountId}
+                    onChange={e => setExpenseBankAccountId(e.target.value)}
+                    className="w-full rounded-lg border border-card-border bg-card-bg px-3 py-2.5 text-sm outline-none cursor-pointer"
+                    style={{ color: "var(--foreground)" }}
+                  >
+                    <option value="">Select bank...</option>
+                    {bankAccounts.map(ba => (
+                      <option key={ba.id} value={ba.id}>{ba.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-xs text-muted mb-1">Notes (optional)</label>
+                <input
+                  type="text"
+                  value={expenseNotes}
+                  onChange={e => setExpenseNotes(e.target.value)}
+                  placeholder="Optional notes..."
+                  className="w-full rounded-lg border border-card-border bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent-gold/50"
+                  style={{ color: "var(--foreground)" }}
+                />
+              </div>
+              <button
+                onClick={submitExpense}
+                disabled={!expenseTypeId || !expenseAmount || parseFloat(expenseAmount) <= 0 || (expensePaymentMethod === "BANK" && !expenseBankAccountId) || submittingExpense}
+                className="rounded-lg px-6 py-2.5 text-sm font-semibold tracking-wider uppercase cursor-pointer disabled:opacity-30 transition-opacity"
+                style={{ backgroundColor: "rgba(199, 69, 69, 0.2)", color: "var(--danger)", border: "1px solid rgba(199, 69, 69, 0.3)" }}
+              >
+                {submittingExpense ? "..." : "Record Expense"}
+              </button>
+            </div>
+
+            {/* Today's Expenses List */}
+            <div>
+              <div className="text-xs font-semibold tracking-wider uppercase text-muted mb-2">
+                Today{`'`}s Expenses {expensesReport && expensesReport.total > 0 && (
+                  <span style={{ color: "var(--danger)" }}> — {formatMoney(expensesReport.total)}</span>
+                )}
+              </div>
+              <div className="rounded-lg border border-card-border/50 overflow-hidden max-h-64 overflow-y-auto">
+                {!expensesReport || expensesReport.expenses.length === 0 ? (
+                  <div className="px-4 py-6 text-center text-muted text-xs">No expenses today</div>
+                ) : (
+                  expensesReport.expenses.map(exp => (
+                    <div key={exp.id} className="flex items-center px-4 py-2.5 border-b border-card-border/30 last:border-0 hover:bg-card-border/20 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium" style={{ color: "var(--danger)" }}>{exp.expenseType.name}</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[10px] text-muted">{exp.paymentMethod === "BANK" && exp.bankAccount ? exp.bankAccount.name : "Cash"}</span>
+                          {exp.notes && <span className="text-[10px] text-muted truncate">— {exp.notes}</span>}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-sm font-bold" style={{ color: "var(--danger)" }}>-{formatMoney(exp.amount)}</span>
+                        <p className="text-[10px] text-muted">{new Date(exp.createdAt).toLocaleTimeString()}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>

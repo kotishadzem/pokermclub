@@ -96,6 +96,24 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Include expenses in channel outflows
+  const expenses = await prisma.expense.findMany({
+    where: { createdAt: { gte: dayStart, lte: dayEnd } },
+    select: { amount: true, paymentMethod: true, bankAccountId: true },
+  });
+
+  for (const exp of expenses) {
+    if (exp.paymentMethod === "BANK" && exp.bankAccountId) {
+      if (!bankChannels[exp.bankAccountId]) {
+        const ba = await prisma.bankAccount.findUnique({ where: { id: exp.bankAccountId } });
+        bankChannels[exp.bankAccountId] = { name: ba?.name || "Bank", icon: "bank", opening: obMap[exp.bankAccountId] || 0, in: 0, out: 0, net: 0, balance: 0 };
+      }
+      bankChannels[exp.bankAccountId].out += exp.amount;
+    } else {
+      cashChannel.out += exp.amount;
+    }
+  }
+
   cashChannel.net = cashChannel.in - cashChannel.out;
   cashChannel.balance = cashChannel.opening + cashChannel.net;
   depositChannel.net = depositChannel.in - depositChannel.out;
@@ -133,9 +151,11 @@ export async function GET(req: NextRequest) {
   });
   const totalTipsCollected = tipCollections._sum.amount || 0;
 
+  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+
   return NextResponse.json({
     date: dateStr,
-    summary: { ...summary, totalRake, totalTipsCollected },
+    summary: { ...summary, totalRake, totalTipsCollected, totalExpenses },
     channels,
     transactions,
   });

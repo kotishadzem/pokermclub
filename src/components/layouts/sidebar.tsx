@@ -40,6 +40,7 @@ const NAV_CONFIG: Record<string, NavItem[]> = {
     { label: "Opening Balances", href: "/cashier/opening-balances", icon: "◎" },
     { label: "Currencies", href: "/cashier/currencies", icon: "💱" },
     { label: "Chips", href: "/cashier/chips", icon: "●" },
+    { label: "Expenses", href: "/cashier/expense-types", icon: "◇" },
   ],
   DEALER: [
     { label: "My Table", href: "/dealer/table", icon: "▣" },
