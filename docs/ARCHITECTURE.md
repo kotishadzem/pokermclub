@@ -138,7 +138,7 @@ pokemclub/
 ### Transactions
 - `GET /api/transactions?type=&from=&to=&limit=` — List transactions with filters
 - `POST /api/transactions` — Create transaction (outgoing transactions check available balance: opening + in - out; returns 400 "Insufficient funds" if exceeded)
-- `PUT /api/transactions/[id]` — Edit transaction (amount, type, paymentMethod, bankAccountId, notes, currencyId). Recalculates amountInGel on currency change. Balance validation for outgoing types excludes the original transaction.
+- `PUT /api/transactions/[id]` — Edit transaction (amount, type, paymentMethod, bankAccountId, notes, currencyId). Recalculates amountInGel on currency change. Balance validation for outgoing types excludes the original transaction. **Author-restricted**: only the user who created the transaction can edit it (403 otherwise).
 - `GET /api/transactions/reports?date=` — Daily report with aggregates + per-channel breakdown (Cash, per-bank-account, Deposits). Each channel includes `opening`, `in`, `out`, `net`, and `balance` fields.
 
 ### Opening Balances
@@ -157,12 +157,12 @@ pokemclub/
 ### Rake Collections
 - `POST /api/rake-collections` — Record rake collection. Body: `{ tableId, amount, notes?, chipBreakdown? }`
 - `GET /api/rake-collections?date=` — Rake collections report for date (default: today). Returns `{ date, grandTotal, byTable: [{tableId, tableName, total, count}], collections: [...] }`
-- `PUT /api/rake-collections/[id]` — Edit rake collection (amount, tableId, notes). All fields optional, keeps original if omitted.
+- `PUT /api/rake-collections/[id]` — Edit rake collection (amount, tableId, notes). All fields optional, keeps original if omitted. **Author-restricted**.
 
 ### Tips
 - `POST /api/tips` — Record tip collection (cashier receives tips from dealer). Body: `{ tableId, amount, notes?, chipBreakdown? }`
 - `GET /api/tips?date=` — Tips report for date (default: today). Returns `{ date, grandTotal, byTable: [{tableId, tableName, total, count}], collections: [...] }`
-- `PUT /api/tips/[id]` — Edit tip collection (amount, tableId, notes). All fields optional, keeps original if omitted.
+- `PUT /api/tips/[id]` — Edit tip collection (amount, tableId, notes). All fields optional, keeps original if omitted. **Author-restricted**.
 
 ### Expense Types
 - `GET /api/expense-types` — List active expense types
@@ -173,6 +173,8 @@ pokemclub/
 ### Expenses
 - `GET /api/expenses?date=` — Today's expenses with totals. Returns `{ date, total, expenses: [...] }`
 - `POST /api/expenses` — Record expense. Body: `{ expenseTypeId, amount, paymentMethod, bankAccountId?, notes? }`. Checks channel balance before recording. Expenses reduce channel balances in daily reports.
+- `PUT /api/expenses/[id]` — Edit expense (expenseTypeId, amount, paymentMethod, bankAccountId, notes, chipBreakdown). Balance validation excludes original expense. **Author-restricted**.
+- `DELETE /api/expenses/[id]` — Delete expense. **Author-restricted**.
 
 ### Chip Inventory
 - `GET /api/chips/inventory` — Returns per-denomination chip counts: `{ chips: [{ chipId, denomination, color, total, cashier, field }] }`. Cashier = total - chips given out (buy-in) + chips received (cash-out, rake, tips) - chips spent (internal expenses). Field = total - cashier.
@@ -271,6 +273,7 @@ docker compose exec app npm run seed            # Seed data
 10. **Tip Collections** ✅ — Cashier records physical tip cash received from dealers per table. Dashboard shows summary total (Tips Collected card alongside Rake and Total Balance). Tip collection history is displayed on the Transactions page. Reports include `totalTipsCollected`.
 11. **Registrator Role** ✅ — Room visit tracking (check-in/check-out) via modal dialogs with editable datetime pickers, player registration access, live room occupancy counter with 5s polling.
 12. **Expenses & Chip Inventory** ✅ — Expense types with isInternal flag, expense recording with chip breakdown for internal expenses, balance checking against channel balances. Chip inventory tracking: cashier vs field counts per denomination, updated by buy-in (-), cash-out (+), rake (+), tips (+), internal expenses (-). Chip breakdown inputs on rake/tip collection forms with auto-calculated amounts.
+13. **Author Tracking & Edit Restrictions** ✅ — Every transaction, expense, rake collection, and tip collection records the author (userId). Author name displayed in Cashier column. Edit buttons only visible for own records (frontend). API returns 403 if a user tries to edit another user's records (backend). Dashboard shows author name on recent transactions.
 
 ## Real-time Update System
 
