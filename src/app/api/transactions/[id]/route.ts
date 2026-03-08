@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/api-auth";
 import { bumpVersion } from "@/lib/version";
+import { PaymentSplit, getTransactionChannelAmount } from "@/lib/payment-splits";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function PUT(
@@ -12,7 +13,7 @@ export async function PUT(
 
   const { id } = await params;
   const body = await req.json();
-  const { amount, type, paymentMethod, bankAccountId, notes, currencyId, chipBreakdown } = body;
+  const { amount, type, paymentMethod, bankAccountId, notes, currencyId, chipBreakdown, paymentSplits: rawSplits } = body;
 
   // Load original transaction
   const original = await prisma.transaction.findUnique({ where: { id } });
@@ -27,28 +28,17 @@ export async function PUT(
 
   const newAmount = amount ?? original.amount;
   const newType = type ?? original.type;
-  const newPaymentMethod = paymentMethod ?? original.paymentMethod ?? "CASH";
 
   if (newAmount <= 0) {
     return NextResponse.json({ error: "Amount must be positive" }, { status: 400 });
   }
-
-  if (newPaymentMethod === "BANK" && !bankAccountId && !original.bankAccountId) {
-    return NextResponse.json({ error: "Bank account required for bank payments" }, { status: 400 });
-  }
-
-  const newBankAccountId = newPaymentMethod === "BANK"
-    ? (bankAccountId ?? original.bankAccountId)
-    : null;
 
   // Resolve currency and exchange rate
   let currencyCode = "GEL";
   let exchangeRate = 1;
   let resolvedCurrencyId: string | null = null;
 
-  // currencyId === null means explicitly GEL; undefined means keep original
   if (currencyId === null) {
-    // Explicitly set to GEL
     currencyCode = "GEL";
     exchangeRate = 1;
     resolvedCurrencyId = null;
@@ -61,7 +51,6 @@ export async function PUT(
     exchangeRate = curr.exchangeRate;
     resolvedCurrencyId = curr.id;
   } else {
-    // Keep original
     currencyCode = original.currencyCode;
     exchangeRate = original.exchangeRate;
     resolvedCurrencyId = original.currencyId;
@@ -69,67 +58,110 @@ export async function PUT(
 
   const amountInGel = newAmount * exchangeRate;
 
-  // Balance check for outgoing transactions (excluding original tx)
+  // Build payment splits
+  let newSplits: PaymentSplit[] | null = null;
+  if (rawSplits && Array.isArray(rawSplits) && rawSplits.length > 0) {
+    newSplits = rawSplits.map((s: { channel: string; channelName: string; amount: number }) => ({
+      channel: s.channel,
+      channelName: s.channelName,
+      amount: s.amount,
+      amountInGel: s.amount * exchangeRate,
+    }));
+    const splitsTotal = newSplits.reduce((sum, s) => sum + s.amountInGel, 0);
+    if (Math.abs(splitsTotal - amountInGel) > 0.01) {
+      return NextResponse.json({ error: "Payment splits total does not match amount" }, { status: 400 });
+    }
+  } else if (rawSplits === undefined && original.paymentSplits) {
+    // Keep original splits but recalculate amounts if amount/currency changed
+    const origSplits = original.paymentSplits as PaymentSplit[];
+    const origTotal = origSplits.reduce((sum, s) => sum + s.amountInGel, 0);
+    if (Math.abs(origTotal - amountInGel) < 0.01) {
+      newSplits = origSplits;
+    } else {
+      // Amount changed — can't keep old splits proportions, use legacy fallback
+      const pm = paymentMethod ?? original.paymentMethod ?? "CASH";
+      const baId = pm === "BANK" ? (bankAccountId ?? original.bankAccountId) : null;
+      if (pm === "BANK" && baId) {
+        const ba = await prisma.bankAccount.findUnique({ where: { id: baId } });
+        newSplits = [{ channel: baId, channelName: ba?.name || "Bank", amount: newAmount, amountInGel }];
+      } else {
+        newSplits = [{ channel: "CASH", channelName: "Cash", amount: newAmount, amountInGel }];
+      }
+    }
+  } else if (newType !== "DEPOSIT" && newType !== "WITHDRAWAL") {
+    const pm = paymentMethod ?? original.paymentMethod ?? "CASH";
+    const baId = pm === "BANK" ? (bankAccountId ?? original.bankAccountId) : null;
+    if (pm === "BANK" && baId) {
+      const ba = await prisma.bankAccount.findUnique({ where: { id: baId } });
+      newSplits = [{ channel: baId, channelName: ba?.name || "Bank", amount: newAmount, amountInGel }];
+    } else {
+      newSplits = [{ channel: "CASH", channelName: "Cash", amount: newAmount, amountInGel }];
+    }
+  }
+
+  // Balance check for outgoing transactions (per-channel, excluding original tx)
   if (newType === "CASH_OUT" || newType === "WITHDRAWAL" || newType === "RAKEBACK_PAYOUT") {
     const txDate = new Date(original.createdAt);
     const dayStr = txDate.toISOString().split("T")[0];
     const dayStart = new Date(dayStr + "T00:00:00.000Z");
     const dayEnd = new Date(dayStr + "T23:59:59.999Z");
 
-    let channel: string;
-    let channelName: string;
-
+    const channelsToCheck: { channel: string; channelName: string; needed: number }[] = [];
     if (newType === "WITHDRAWAL") {
-      channel = "DEPOSITS";
-      channelName = "Deposits";
-    } else if (newPaymentMethod === "BANK" && newBankAccountId) {
-      channel = newBankAccountId;
-      const ba = await prisma.bankAccount.findUnique({ where: { id: newBankAccountId } });
-      channelName = ba?.name || "Bank";
-    } else {
-      channel = "CASH";
-      channelName = "Cash";
-    }
-
-    // Get opening balance for this channel
-    const opening = await prisma.openingBalance.findUnique({
-      where: { date_channel: { date: dayStart, channel } },
-    });
-    const openingAmount = opening?.amount || 0;
-
-    // Calculate today's in/out for this channel, EXCLUDING the original transaction
-    const todayTxs = await prisma.transaction.findMany({
-      where: {
-        createdAt: { gte: dayStart, lte: dayEnd },
-        id: { not: id },
-      },
-      select: { type: true, amount: true, amountInGel: true, paymentMethod: true, bankAccountId: true },
-    });
-
-    let totalIn = 0;
-    let totalOut = 0;
-
-    for (const t of todayTxs) {
-      const gelAmount = t.amountInGel ?? t.amount;
-      if (channel === "CASH") {
-        if (t.type === "BUY_IN" && t.paymentMethod !== "BANK") totalIn += gelAmount;
-        if ((t.type === "CASH_OUT" || t.type === "RAKEBACK_PAYOUT") && t.paymentMethod !== "BANK") totalOut += gelAmount;
-      } else if (channel === "DEPOSITS") {
-        if (t.type === "DEPOSIT") totalIn += gelAmount;
-        if (t.type === "WITHDRAWAL") totalOut += gelAmount;
-      } else {
-        if (t.type === "BUY_IN" && t.paymentMethod === "BANK" && t.bankAccountId === channel) totalIn += gelAmount;
-        if ((t.type === "CASH_OUT" || t.type === "RAKEBACK_PAYOUT") && t.paymentMethod === "BANK" && t.bankAccountId === channel) totalOut += gelAmount;
+      channelsToCheck.push({ channel: "DEPOSITS", channelName: "Deposits", needed: amountInGel });
+    } else if (newSplits && newSplits.length > 0) {
+      for (const s of newSplits) {
+        channelsToCheck.push({ channel: s.channel, channelName: s.channelName, needed: s.amountInGel });
       }
     }
 
-    const available = openingAmount + totalIn - totalOut;
-    if (available < amountInGel) {
-      return NextResponse.json(
-        { error: `Insufficient funds in ${channelName}. Available: GEL ${available.toFixed(2)}` },
-        { status: 400 }
-      );
+    if (channelsToCheck.length > 0) {
+      const todayTxs = await prisma.transaction.findMany({
+        where: { createdAt: { gte: dayStart, lte: dayEnd }, id: { not: id } },
+        select: { type: true, amount: true, amountInGel: true, paymentMethod: true, bankAccountId: true, paymentSplits: true },
+      });
+
+      for (const ch of channelsToCheck) {
+        const opening = await prisma.openingBalance.findUnique({
+          where: { date_channel: { date: dayStart, channel: ch.channel } },
+        });
+        const openingAmount = opening?.amount || 0;
+
+        let totalIn = 0;
+        let totalOut = 0;
+
+        for (const t of todayTxs) {
+          const chAmount = getTransactionChannelAmount(t, ch.channel);
+          if (chAmount > 0) {
+            if (ch.channel === "DEPOSITS") {
+              if (t.type === "DEPOSIT") totalIn += chAmount;
+              if (t.type === "WITHDRAWAL") totalOut += chAmount;
+            } else {
+              if (t.type === "BUY_IN") totalIn += chAmount;
+              if (t.type === "CASH_OUT" || t.type === "RAKEBACK_PAYOUT") totalOut += chAmount;
+            }
+          }
+        }
+
+        const available = openingAmount + totalIn - totalOut;
+        if (available < ch.needed) {
+          return NextResponse.json(
+            { error: `Insufficient funds in ${ch.channelName}. Available: GEL ${available.toFixed(2)}` },
+            { status: 400 }
+          );
+        }
+      }
     }
+  }
+
+  // Derive legacy fields from splits
+  let legacyPaymentMethod = "CASH";
+  let legacyBankAccountId: string | null = null;
+  if (newType === "DEPOSIT" || newType === "WITHDRAWAL") {
+    legacyPaymentMethod = "CASH";
+  } else if (newSplits && newSplits.length === 1 && newSplits[0].channel !== "CASH") {
+    legacyPaymentMethod = "BANK";
+    legacyBankAccountId = newSplits[0].channel;
   }
 
   const updated = await prisma.transaction.update({
@@ -141,10 +173,11 @@ export async function PUT(
       currencyId: resolvedCurrencyId,
       currencyCode,
       exchangeRate,
-      paymentMethod: newPaymentMethod === "BANK" ? "BANK" : "CASH",
-      bankAccountId: newBankAccountId,
+      paymentMethod: legacyPaymentMethod as "CASH" | "BANK",
+      bankAccountId: legacyBankAccountId,
       notes: notes !== undefined ? (notes || null) : original.notes,
       ...(chipBreakdown !== undefined ? { chipBreakdown: chipBreakdown && Array.isArray(chipBreakdown) && chipBreakdown.length > 0 ? chipBreakdown : null } : {}),
+      paymentSplits: newSplits && newSplits.length > 0 ? newSplits : null,
     },
     include: {
       player: { select: { id: true, firstName: true, lastName: true } },

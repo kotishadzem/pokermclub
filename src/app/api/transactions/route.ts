@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/api-auth";
 import { bumpVersion } from "@/lib/version";
+import { PaymentSplit, getTransactionChannelAmount } from "@/lib/payment-splits";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
   const { error, session } = await requireRole(["ADMIN", "CASHIER"]);
   if (error) return error;
 
-  const { playerId, type, amount, notes, paymentMethod, bankAccountId, currencyId, chipBreakdown } = await req.json();
+  const { playerId, type, amount, notes, paymentMethod, bankAccountId, currencyId, chipBreakdown, paymentSplits: rawSplits } = await req.json();
   if (!playerId || !type || amount === undefined) {
     return NextResponse.json({ error: "playerId, type, and amount required" }, { status: 400 });
   }
@@ -54,10 +55,6 @@ export async function POST(req: NextRequest) {
 
   if (amount <= 0) {
     return NextResponse.json({ error: "Amount must be positive" }, { status: 400 });
-  }
-
-  if (paymentMethod === "BANK" && !bankAccountId) {
-    return NextResponse.json({ error: "Bank account required for bank payments" }, { status: 400 });
   }
 
   // Resolve currency and exchange rate
@@ -85,64 +82,115 @@ export async function POST(req: NextRequest) {
 
   const amountInGel = amount * exchangeRate;
 
-  // Balance check for outgoing transactions
+  // Build payment splits
+  let paymentSplits: PaymentSplit[] | null = null;
+  if (rawSplits && Array.isArray(rawSplits) && rawSplits.length > 0) {
+    paymentSplits = rawSplits.map((s: { channel: string; channelName: string; amount: number }) => ({
+      channel: s.channel,
+      channelName: s.channelName,
+      amount: s.amount,
+      amountInGel: s.amount * exchangeRate,
+    }));
+    const splitsTotal = paymentSplits.reduce((sum, s) => sum + s.amountInGel, 0);
+    if (Math.abs(splitsTotal - amountInGel) > 0.01) {
+      return NextResponse.json({ error: "Payment splits total does not match amount" }, { status: 400 });
+    }
+  } else if (type !== "DEPOSIT" && type !== "WITHDRAWAL") {
+    // No splits provided — build single-channel split from legacy fields
+    if (paymentMethod === "BANK" && !bankAccountId) {
+      return NextResponse.json({ error: "Bank account required for bank payments" }, { status: 400 });
+    }
+    if (paymentMethod === "BANK" && bankAccountId) {
+      const ba = await prisma.bankAccount.findUnique({ where: { id: bankAccountId } });
+      paymentSplits = [{ channel: bankAccountId, channelName: ba?.name || "Bank", amount, amountInGel }];
+    } else {
+      paymentSplits = [{ channel: "CASH", channelName: "Cash", amount, amountInGel }];
+    }
+  }
+
+  // Balance check for outgoing transactions (per-channel)
   if (type === "CASH_OUT" || type === "WITHDRAWAL") {
     const today = new Date().toISOString().split("T")[0];
     const dayStart = new Date(today + "T00:00:00.000Z");
     const dayEnd = new Date(today + "T23:59:59.999Z");
 
-    let channel: string;
-    let channelName: string;
-
+    // Determine which channels to check
+    const channelsToCheck: { channel: string; channelName: string; needed: number }[] = [];
     if (type === "WITHDRAWAL") {
-      channel = "DEPOSITS";
-      channelName = "Deposits";
-    } else if (paymentMethod === "BANK" && bankAccountId) {
-      channel = bankAccountId;
-      const ba = await prisma.bankAccount.findUnique({ where: { id: bankAccountId } });
-      channelName = ba?.name || "Bank";
-    } else {
-      channel = "CASH";
-      channelName = "Cash";
-    }
-
-    // Get opening balance for this channel today
-    const opening = await prisma.openingBalance.findUnique({
-      where: { date_channel: { date: dayStart, channel } },
-    });
-    const openingAmount = opening?.amount || 0;
-
-    // Calculate today's in/out for this channel
-    const todayTxs = await prisma.transaction.findMany({
-      where: { createdAt: { gte: dayStart, lte: dayEnd } },
-      select: { type: true, amount: true, amountInGel: true, paymentMethod: true, bankAccountId: true },
-    });
-
-    let totalIn = 0;
-    let totalOut = 0;
-
-    for (const t of todayTxs) {
-      const gelAmount = t.amountInGel ?? t.amount;
-      if (channel === "CASH") {
-        if (t.type === "BUY_IN" && t.paymentMethod !== "BANK") totalIn += gelAmount;
-        if (t.type === "CASH_OUT" && t.paymentMethod !== "BANK") totalOut += gelAmount;
-      } else if (channel === "DEPOSITS") {
-        if (t.type === "DEPOSIT") totalIn += gelAmount;
-        if (t.type === "WITHDRAWAL") totalOut += gelAmount;
-      } else {
-        // Bank account channel
-        if (t.type === "BUY_IN" && t.paymentMethod === "BANK" && t.bankAccountId === channel) totalIn += gelAmount;
-        if (t.type === "CASH_OUT" && t.paymentMethod === "BANK" && t.bankAccountId === channel) totalOut += gelAmount;
+      channelsToCheck.push({ channel: "DEPOSITS", channelName: "Deposits", needed: amountInGel });
+    } else if (paymentSplits && paymentSplits.length > 0) {
+      for (const s of paymentSplits) {
+        channelsToCheck.push({ channel: s.channel, channelName: s.channelName, needed: s.amountInGel });
       }
     }
 
-    const available = openingAmount + totalIn - totalOut;
-    if (available < amountInGel) {
-      return NextResponse.json(
-        { error: `Insufficient funds in ${channelName}. Available: GEL ${available.toFixed(2)}` },
-        { status: 400 }
-      );
+    if (channelsToCheck.length > 0) {
+      const todayTxs = await prisma.transaction.findMany({
+        where: { createdAt: { gte: dayStart, lte: dayEnd } },
+        select: { type: true, amount: true, amountInGel: true, paymentMethod: true, bankAccountId: true, paymentSplits: true },
+      });
+
+      // Also get today's expenses per channel
+      const todayExpenses = await prisma.expense.findMany({
+        where: { createdAt: { gte: dayStart, lte: dayEnd } },
+        select: { amount: true, paymentMethod: true, bankAccountId: true },
+      });
+
+      for (const ch of channelsToCheck) {
+        const opening = await prisma.openingBalance.findUnique({
+          where: { date_channel: { date: dayStart, channel: ch.channel } },
+        });
+        const openingAmount = opening?.amount || 0;
+
+        let totalIn = 0;
+        let totalOut = 0;
+
+        for (const t of todayTxs) {
+          const chAmount = getTransactionChannelAmount(t, ch.channel);
+          if (chAmount > 0) {
+            if (ch.channel === "DEPOSITS") {
+              if (t.type === "DEPOSIT") totalIn += chAmount;
+              if (t.type === "WITHDRAWAL") totalOut += chAmount;
+            } else {
+              if (t.type === "BUY_IN") totalIn += chAmount;
+              if (t.type === "CASH_OUT") totalOut += chAmount;
+            }
+          }
+        }
+
+        // Expenses reduce channel balance
+        if (ch.channel === "CASH") {
+          for (const exp of todayExpenses) {
+            if (exp.paymentMethod !== "BANK") totalOut += exp.amount;
+          }
+        } else if (ch.channel !== "DEPOSITS") {
+          for (const exp of todayExpenses) {
+            if (exp.paymentMethod === "BANK" && exp.bankAccountId === ch.channel) totalOut += exp.amount;
+          }
+        }
+
+        const available = openingAmount + totalIn - totalOut;
+        if (available < ch.needed) {
+          return NextResponse.json(
+            { error: `Insufficient funds in ${ch.channelName}. Available: GEL ${available.toFixed(2)}` },
+            { status: 400 }
+          );
+        }
+      }
     }
+  }
+
+  // Derive legacy paymentMethod/bankAccountId from splits for backward compat
+  let legacyPaymentMethod = "CASH";
+  let legacyBankAccountId: string | null = null;
+  if (type === "DEPOSIT" || type === "WITHDRAWAL") {
+    legacyPaymentMethod = "CASH";
+  } else if (paymentSplits && paymentSplits.length === 1 && paymentSplits[0].channel !== "CASH") {
+    legacyPaymentMethod = "BANK";
+    legacyBankAccountId = paymentSplits[0].channel;
+  } else if (paymentSplits && paymentSplits.length > 1) {
+    // Multi-split: legacy fields not meaningful, set to CASH
+    legacyPaymentMethod = "CASH";
   }
 
   const transaction = await prisma.transaction.create({
@@ -151,13 +199,14 @@ export async function POST(req: NextRequest) {
       type,
       amount,
       notes: notes || null,
-      paymentMethod: paymentMethod === "BANK" ? "BANK" : "CASH",
-      bankAccountId: paymentMethod === "BANK" ? bankAccountId : null,
+      paymentMethod: legacyPaymentMethod as "CASH" | "BANK",
+      bankAccountId: legacyBankAccountId,
       currencyId: resolvedCurrencyId,
       currencyCode,
       exchangeRate,
       amountInGel,
       chipBreakdown: chipBreakdown && Array.isArray(chipBreakdown) && chipBreakdown.length > 0 ? chipBreakdown : undefined,
+      paymentSplits: paymentSplits && paymentSplits.length > 0 ? paymentSplits : undefined,
       userId: (session!.user as { id: string }).id,
     },
     include: {

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/api-auth";
+import { PaymentSplit } from "@/lib/payment-splits";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
@@ -38,11 +39,7 @@ export async function GET(req: NextRequest) {
   for (const t of transactions) {
     const gelAmount = t.amountInGel ?? t.amount;
     switch (t.type) {
-      case "BUY_IN":
-        summary.totalBuyIns += gelAmount;
-        if (t.paymentMethod === "BANK") summary.totalBuyInsBank += gelAmount;
-        else summary.totalBuyInsCash += gelAmount;
-        break;
+      case "BUY_IN": summary.totalBuyIns += gelAmount; break;
       case "CASH_OUT": summary.totalCashOuts += gelAmount; break;
       case "DEPOSIT": summary.totalDeposits += gelAmount; break;
       case "WITHDRAWAL": summary.totalWithdrawals += gelAmount; break;
@@ -64,35 +61,63 @@ export async function GET(req: NextRequest) {
   const depositChannel = { name: "Deposits", icon: "deposit", opening: obMap["DEPOSITS"] || 0, in: 0, out: 0, net: 0, balance: 0 };
   const bankChannels: Record<string, { name: string; icon: string; opening: number; in: number; out: number; net: number; balance: number }> = {};
 
+  // Helper to ensure a bank channel entry exists
+  function ensureBankChannel(bankId: string, bankName: string) {
+    if (!bankChannels[bankId]) {
+      bankChannels[bankId] = { name: bankName, icon: "bank", opening: obMap[bankId] || 0, in: 0, out: 0, net: 0, balance: 0 };
+    }
+  }
+
+  // Helper to attribute an amount to a channel
+  function attributeToChannel(channelId: string, channelName: string, direction: "in" | "out", amount: number) {
+    if (channelId === "CASH") {
+      cashChannel[direction] += amount;
+    } else if (channelId === "DEPOSITS") {
+      depositChannel[direction] += amount;
+    } else {
+      ensureBankChannel(channelId, channelName);
+      bankChannels[channelId][direction] += amount;
+    }
+  }
+
   for (const t of transactions) {
     const gelAmount = t.amountInGel ?? t.amount;
-    switch (t.type) {
-      case "BUY_IN":
-        if (t.paymentMethod === "BANK" && t.bankAccount) {
-          if (!bankChannels[t.bankAccount.id]) {
-            bankChannels[t.bankAccount.id] = { name: t.bankAccount.name, icon: "bank", opening: obMap[t.bankAccount.id] || 0, in: 0, out: 0, net: 0, balance: 0 };
-          }
-          bankChannels[t.bankAccount.id].in += gelAmount;
-        } else {
-          cashChannel.in += gelAmount;
-        }
-        break;
-      case "CASH_OUT":
-        if (t.paymentMethod === "BANK" && t.bankAccount) {
-          if (!bankChannels[t.bankAccount.id]) {
-            bankChannels[t.bankAccount.id] = { name: t.bankAccount.name, icon: "bank", opening: obMap[t.bankAccount.id] || 0, in: 0, out: 0, net: 0, balance: 0 };
-          }
-          bankChannels[t.bankAccount.id].out += gelAmount;
-        } else {
-          cashChannel.out += gelAmount;
-        }
-        break;
-      case "DEPOSIT":
-        depositChannel.in += gelAmount;
-        break;
-      case "WITHDRAWAL":
-        depositChannel.out += gelAmount;
-        break;
+    const splits = t.paymentSplits as PaymentSplit[] | null;
+
+    if (t.type === "DEPOSIT") {
+      depositChannel.in += gelAmount;
+      continue;
+    }
+    if (t.type === "WITHDRAWAL") {
+      depositChannel.out += gelAmount;
+      continue;
+    }
+
+    const direction = (t.type === "BUY_IN") ? "in" : "out";
+
+    if (splits && Array.isArray(splits) && splits.length > 0) {
+      // Distribute via payment splits
+      let cashSplitTotal = 0;
+      let bankSplitTotal = 0;
+      for (const s of splits) {
+        attributeToChannel(s.channel, s.channelName, direction, s.amountInGel);
+        if (s.channel === "CASH") cashSplitTotal += s.amountInGel;
+        else bankSplitTotal += s.amountInGel;
+      }
+      if (t.type === "BUY_IN") {
+        summary.totalBuyInsCash += cashSplitTotal;
+        summary.totalBuyInsBank += bankSplitTotal;
+      }
+    } else {
+      // Legacy: single channel
+      if (t.paymentMethod === "BANK" && t.bankAccount) {
+        ensureBankChannel(t.bankAccount.id, t.bankAccount.name);
+        bankChannels[t.bankAccount.id][direction] += gelAmount;
+        if (t.type === "BUY_IN") summary.totalBuyInsBank += gelAmount;
+      } else {
+        cashChannel[direction] += gelAmount;
+        if (t.type === "BUY_IN") summary.totalBuyInsCash += gelAmount;
+      }
     }
   }
 

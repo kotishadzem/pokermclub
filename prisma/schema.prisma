@@ -197,6 +197,7 @@ model Transaction {
   exchangeRate  Float           @default(1)
   amountInGel   Float?
   chipBreakdown Json?
+  paymentSplits Json?
   userId        String
   user          User            @relation(fields: [userId], references: [id])
   createdAt     DateTime        @default(now())

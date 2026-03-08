@@ -174,8 +174,7 @@ export default function CashierDashboard() {
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [dayReport, setDayReport] = useState<DayReport | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "BANK">("CASH");
-  const [bankAccountId, setBankAccountId] = useState("");
+  const [splitAmounts, setSplitAmounts] = useState<Record<string, string>>({});
   const [bankAccounts, setBankAccounts] = useState<BankAccountOption[]>([]);
   const [currencies, setCurrencies] = useState<CurrencyOption[]>([]);
   const [selectedCurrencyId, setSelectedCurrencyId] = useState("");
@@ -288,11 +287,31 @@ export default function CashierDashboard() {
     }
   }
 
+  // Payment splits helpers
+  const splitsTotal = Object.values(splitAmounts).reduce((sum, v) => sum + (parseFloat(v) || 0), 0);
+  const hasSplitEntries = Object.values(splitAmounts).some(v => parseFloat(v) > 0);
+  const splitsMatchAmount = amount ? Math.abs(splitsTotal - parseFloat(amount)) < 0.01 : false;
+  const isDepositWithdrawal = activeAction === "DEPOSIT" || activeAction === "WITHDRAWAL";
+
+  function setSplitAmount(channel: string, value: string) {
+    setSplitAmounts(prev => ({ ...prev, [channel]: value }));
+  }
+
   async function submitTransaction() {
     if (!selectedPlayer || !activeAction || !amount) return;
     setSubmitting(true);
     try {
       const selectedCurr = currencies.find(c => c.id === selectedCurrencyId);
+
+      // Build payment splits from the split amounts
+      const splits = !isDepositWithdrawal ? Object.entries(splitAmounts)
+        .filter(([, amt]) => amt && parseFloat(amt) > 0)
+        .map(([channel, amt]) => ({
+          channel,
+          channelName: channel === "CASH" ? "Cash" : bankAccounts.find(b => b.id === channel)?.name || "Bank",
+          amount: parseFloat(amt),
+        })) : undefined;
+
       const res = await fetch("/api/transactions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -301,8 +320,6 @@ export default function CashierDashboard() {
           type: activeAction,
           amount: parseFloat(amount),
           notes: notes || null,
-          paymentMethod,
-          bankAccountId: paymentMethod === "BANK" ? bankAccountId : null,
           currencyId: selectedCurr && !selectedCurr.isBase ? selectedCurr.id : undefined,
           chipBreakdown: hasChipEntries ? chips.filter(c => (chipQuantities[c.id] || 0) > 0).map(c => ({
             chipId: c.id,
@@ -311,6 +328,7 @@ export default function CashierDashboard() {
             quantity: chipQuantities[c.id],
             subtotal: c.denomination * chipQuantities[c.id],
           })) : null,
+          paymentSplits: splits && splits.length > 0 ? splits : undefined,
         }),
       });
       if (res.ok) {
@@ -321,8 +339,7 @@ export default function CashierDashboard() {
         setActiveAction(null);
         setAmount("");
         setNotes("");
-        setPaymentMethod("CASH");
-        setBankAccountId("");
+        setSplitAmounts({});
         setChipQuantities({});
         const base = currencies.find(c => c.isBase);
         if (base) setSelectedCurrencyId(base.id);
@@ -691,7 +708,7 @@ export default function CashierDashboard() {
                 return (
                   <button
                     key={type}
-                    onClick={() => { setActiveAction(isActive ? null : type); setAmount(""); setNotes(""); setPaymentMethod("CASH"); setBankAccountId(""); setChipQuantities({}); const base = currencies.find(c => c.isBase); if (base) setSelectedCurrencyId(base.id); }}
+                    onClick={() => { setActiveAction(isActive ? null : type); setAmount(""); setNotes(""); setSplitAmounts({}); setChipQuantities({}); const base = currencies.find(c => c.isBase); if (base) setSelectedCurrencyId(base.id); }}
                     className="rounded-lg border px-4 py-3 text-sm font-semibold tracking-wider uppercase cursor-pointer transition-all duration-200"
                     style={{
                       borderColor: isActive ? meta.color : meta.borderColor,
@@ -837,53 +854,9 @@ export default function CashierDashboard() {
                       style={{ color: "var(--foreground)" }}
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs text-muted mb-1">Payment</label>
-                    <div className="flex rounded-lg border border-card-border overflow-hidden">
-                      <button
-                        type="button"
-                        onClick={() => setPaymentMethod("CASH")}
-                        className="px-3 py-2.5 text-xs font-semibold tracking-wider uppercase cursor-pointer transition-colors"
-                        style={{
-                          backgroundColor: paymentMethod === "CASH" ? "rgba(13, 74, 46, 0.3)" : "transparent",
-                          color: paymentMethod === "CASH" ? "var(--felt-green-light)" : "var(--muted)",
-                          borderRight: "1px solid var(--card-border)",
-                        }}
-                      >
-                        Cash
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPaymentMethod("BANK")}
-                        className="px-3 py-2.5 text-xs font-semibold tracking-wider uppercase cursor-pointer transition-colors"
-                        style={{
-                          backgroundColor: paymentMethod === "BANK" ? "rgba(201, 168, 76, 0.15)" : "transparent",
-                          color: paymentMethod === "BANK" ? "var(--accent-gold)" : "var(--muted)",
-                        }}
-                      >
-                        Bank
-                      </button>
-                    </div>
-                  </div>
-                  {paymentMethod === "BANK" && (
-                    <div className="min-w-[160px]">
-                      <label className="block text-xs text-muted mb-1">Bank Account</label>
-                      <select
-                        value={bankAccountId}
-                        onChange={e => setBankAccountId(e.target.value)}
-                        className="w-full rounded-lg border border-card-border bg-card-bg px-3 py-2.5 text-sm outline-none cursor-pointer"
-                        style={{ color: "var(--foreground)" }}
-                      >
-                        <option value="">Select account...</option>
-                        {bankAccounts.map(ba => (
-                          <option key={ba.id} value={ba.id}>{ba.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
                   <button
                     onClick={submitTransaction}
-                    disabled={!amount || parseFloat(amount) <= 0 || submitting || (paymentMethod === "BANK" && !bankAccountId)}
+                    disabled={!amount || parseFloat(amount) <= 0 || submitting || (!isDepositWithdrawal && hasSplitEntries && !splitsMatchAmount)}
                     className="rounded-lg px-6 py-2.5 text-sm font-semibold tracking-wider uppercase cursor-pointer disabled:opacity-30 transition-opacity"
                     style={{ background: "linear-gradient(135deg, var(--felt-green), var(--felt-green-light))", color: "var(--foreground)" }}
                   >
@@ -902,6 +875,75 @@ export default function CashierDashboard() {
                   }
                   return null;
                 })()}
+                {/* Payment Splits Table */}
+                {!isDepositWithdrawal && (
+                  <div className="mt-3 rounded-lg border border-card-border overflow-hidden" style={{ animation: "floatUp 0.2s ease-out" }}>
+                    <div className="px-4 py-2 border-b border-card-border/60 flex items-center justify-between">
+                      <span className="text-[10px] font-semibold tracking-wider uppercase text-muted">Payment Split</span>
+                      {hasSplitEntries && amount && (
+                        <span className="text-[10px] font-semibold tracking-wider" style={{ color: splitsMatchAmount ? "var(--felt-green-light)" : "var(--danger)" }}>
+                          {splitsMatchAmount ? "Matched" : `Remaining: ${formatMoney(parseFloat(amount) - splitsTotal)}`}
+                        </span>
+                      )}
+                    </div>
+                    <table className="w-full text-sm">
+                      <tbody>
+                        <tr className="border-b border-card-border/30 hover:bg-card-border/10 transition-colors">
+                          <td className="px-4 py-2">
+                            <div className="flex items-center gap-2">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="3" /></svg>
+                              <span className="text-xs font-medium" style={{ color: "var(--felt-green-light)" }}>Cash</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-2 text-right w-36">
+                            <input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={splitAmounts["CASH"] || ""}
+                              onChange={e => setSplitAmount("CASH", e.target.value)}
+                              placeholder="0.00"
+                              className="w-full rounded border border-card-border bg-transparent px-2 py-1 text-sm text-right outline-none focus:border-accent-gold/50"
+                              style={{ color: "var(--foreground)" }}
+                            />
+                          </td>
+                        </tr>
+                        {bankAccounts.map(ba => (
+                          <tr key={ba.id} className="border-b border-card-border/30 hover:bg-card-border/10 transition-colors">
+                            <td className="px-4 py-2">
+                              <div className="flex items-center gap-2">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3" /></svg>
+                                <span className="text-xs font-medium" style={{ color: "var(--accent-gold)" }}>{ba.name}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-2 text-right w-36">
+                              <input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={splitAmounts[ba.id] || ""}
+                                onChange={e => setSplitAmount(ba.id, e.target.value)}
+                                placeholder="0.00"
+                                className="w-full rounded border border-card-border bg-transparent px-2 py-1 text-sm text-right outline-none focus:border-accent-gold/50"
+                                style={{ color: "var(--foreground)" }}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      {hasSplitEntries && (
+                        <tfoot>
+                          <tr className="border-t border-card-border">
+                            <td className="px-4 py-2 text-right text-xs font-semibold tracking-wider uppercase text-muted">Total</td>
+                            <td className="px-4 py-2 text-right text-sm font-bold" style={{ color: splitsMatchAmount ? "var(--felt-green-light)" : "var(--accent-gold)" }}>
+                              {formatMoney(splitsTotal)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      )}
+                    </table>
+                  </div>
+                )}
               </div>
             )}
           </div>
