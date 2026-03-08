@@ -10,7 +10,7 @@ export async function PUT(
   if (error) return error;
 
   const { id } = await params;
-  const { name } = await req.json();
+  const { name, isInternal } = await req.json();
 
   if (!name || !name.trim()) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -25,7 +25,7 @@ export async function PUT(
 
   const updated = await prisma.expenseType.update({
     where: { id },
-    data: { name: name.trim() },
+    data: { name: name.trim(), isInternal: !!isInternal },
   });
   return NextResponse.json(updated);
 }

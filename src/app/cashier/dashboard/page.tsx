@@ -51,6 +51,7 @@ interface BankAccountOption {
 interface ExpenseTypeOption {
   id: string;
   name: string;
+  isInternal: boolean;
 }
 
 interface ExpenseRecord {
@@ -204,6 +205,7 @@ export default function CashierDashboard() {
   const [expensePaymentMethod, setExpensePaymentMethod] = useState<"CASH" | "BANK">("CASH");
   const [expenseBankAccountId, setExpenseBankAccountId] = useState("");
   const [expenseNotes, setExpenseNotes] = useState("");
+  const [expenseChipQuantities, setExpenseChipQuantities] = useState<Record<string, number>>({});
   const [submittingExpense, setSubmittingExpense] = useState(false);
 
   // Fetch today's summary + tips (live-polled)
@@ -384,6 +386,20 @@ export default function CashierDashboard() {
     setSubmittingRake(false);
   }
 
+  // Expense chip breakdown helpers
+  const selectedExpenseType = expenseTypes.find(t => t.id === expenseTypeId);
+  const showExpenseChips = selectedExpenseType?.isInternal && chips.length > 0;
+  const expenseChipTotal = chips.reduce((sum, c) => sum + c.denomination * (expenseChipQuantities[c.id] || 0), 0);
+  const hasExpenseChipEntries = Object.values(expenseChipQuantities).some(q => q > 0);
+
+  function setExpenseChipQty(chipId: string, qty: number) {
+    const newQ = { ...expenseChipQuantities, [chipId]: Math.max(0, qty) };
+    setExpenseChipQuantities(newQ);
+    const total = chips.reduce((sum, c) => sum + c.denomination * (newQ[c.id] || 0), 0);
+    if (total > 0) setExpenseAmount(total.toString());
+    else setExpenseAmount("");
+  }
+
   async function submitExpense() {
     if (!expenseTypeId || !expenseAmount || parseFloat(expenseAmount) <= 0) return;
     setSubmittingExpense(true);
@@ -397,6 +413,13 @@ export default function CashierDashboard() {
           paymentMethod: expensePaymentMethod,
           bankAccountId: expensePaymentMethod === "BANK" ? expenseBankAccountId : null,
           notes: expenseNotes || null,
+          chipBreakdown: hasExpenseChipEntries ? chips.filter(c => (expenseChipQuantities[c.id] || 0) > 0).map(c => ({
+            chipId: c.id,
+            denomination: c.denomination,
+            color: c.color,
+            quantity: expenseChipQuantities[c.id],
+            subtotal: c.denomination * expenseChipQuantities[c.id],
+          })) : null,
         }),
       });
       if (res.ok) {
@@ -406,6 +429,7 @@ export default function CashierDashboard() {
         setExpenseNotes("");
         setExpensePaymentMethod("CASH");
         setExpenseBankAccountId("");
+        setExpenseChipQuantities({});
         fetch("/api/expenses").then(r => r.json()).then(setExpensesReport).catch(() => {});
         fetch("/api/transactions/reports").then(r => r.json()).then(setDayReport).catch(() => {});
       } else {
@@ -993,10 +1017,57 @@ export default function CashierDashboard() {
                 >
                   <option value="">Select type...</option>
                   {expenseTypes.map(t => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
+                    <option key={t.id} value={t.id}>{t.name}{t.isInternal ? " (internal)" : ""}</option>
                   ))}
                 </select>
               </div>
+              {/* Chip breakdown for internal expenses */}
+              {showExpenseChips && (
+                <div>
+                  <label className="block text-xs text-muted mb-1">Chip Breakdown</label>
+                  <div className="rounded-lg border border-card-border/50 overflow-hidden max-h-48 overflow-y-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-card-border/30">
+                          <th className="text-left px-3 py-1.5 text-muted">Chip</th>
+                          <th className="text-center px-3 py-1.5 text-muted">Qty</th>
+                          <th className="text-right px-3 py-1.5 text-muted">Subtotal</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {chips.map(c => {
+                          const qty = expenseChipQuantities[c.id] || 0;
+                          const hex = c.color ? (CHIP_COLOR_HEX[c.color] || "#6b7c74") : "#6b7c74";
+                          return (
+                            <tr key={c.id} className="border-b border-card-border/20">
+                              <td className="px-3 py-1.5">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-5 h-5 rounded-full inline-flex items-center justify-center text-[8px] font-bold border" style={{ backgroundColor: hex, borderColor: "rgba(255,255,255,0.2)", color: c.color === "white" || c.color === "yellow" ? "#1a1a1a" : "#fff" }}>{c.denomination}</span>
+                                  <span style={{ color: "var(--accent-gold)" }}>{formatMoney(c.denomination)}</span>
+                                </div>
+                              </td>
+                              <td className="px-3 py-1.5 text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <button type="button" onClick={() => setExpenseChipQty(c.id, qty - 1)} className="w-6 h-6 rounded border border-card-border text-muted hover:text-foreground cursor-pointer text-sm">-</button>
+                                  <input type="number" min={0} value={qty || ""} onChange={e => setExpenseChipQty(c.id, parseInt(e.target.value) || 0)} className="w-12 text-center rounded border border-card-border bg-transparent text-sm outline-none py-0.5" style={{ color: "var(--foreground)" }} />
+                                  <button type="button" onClick={() => setExpenseChipQty(c.id, qty + 1)} className="w-6 h-6 rounded border border-card-border text-muted hover:text-foreground cursor-pointer text-sm">+</button>
+                                </div>
+                              </td>
+                              <td className="px-3 py-1.5 text-right font-medium" style={{ color: qty > 0 ? "var(--foreground)" : "var(--muted)" }}>{qty > 0 ? formatMoney(c.denomination * qty) : "—"}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    {hasExpenseChipEntries && (
+                      <div className="flex justify-between px-3 py-2 border-t border-card-border/30 font-semibold text-xs">
+                        <span className="text-muted">Total:</span>
+                        <span style={{ color: "var(--accent-gold)" }}>{formatMoney(expenseChipTotal)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               <div>
                 <label className="block text-xs text-muted mb-1">Amount ({currency.symbol})</label>
                 <input
@@ -1006,8 +1077,9 @@ export default function CashierDashboard() {
                   value={expenseAmount}
                   onChange={e => setExpenseAmount(e.target.value)}
                   placeholder="0.00"
+                  readOnly={!!showExpenseChips}
                   className="w-full rounded-lg border border-card-border bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent-gold/50"
-                  style={{ color: "var(--foreground)" }}
+                  style={{ color: "var(--foreground)", opacity: showExpenseChips ? 0.7 : 1 }}
                 />
               </div>
               <div>

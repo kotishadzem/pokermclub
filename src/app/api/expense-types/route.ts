@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
   const { error } = await requireRole(["ADMIN", "CASHIER"]);
   if (error) return error;
 
-  const { name } = await req.json();
+  const { name, isInternal } = await req.json();
   if (!name || !name.trim()) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   }
 
   const created = await prisma.expenseType.create({
-    data: { name: name.trim() },
+    data: { name: name.trim(), isInternal: !!isInternal },
   });
   return NextResponse.json(created, { status: 201 });
 }

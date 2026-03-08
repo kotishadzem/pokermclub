@@ -70,6 +70,30 @@ interface RakeReport {
   collections: RakeCollectionRecord[];
 }
 
+interface ExpenseTypeOption {
+  id: string;
+  name: string;
+  isInternal: boolean;
+}
+
+interface ExpenseRecord {
+  id: string;
+  amount: number;
+  paymentMethod: string;
+  bankAccountId: string | null;
+  notes: string | null;
+  createdAt: string;
+  expenseType: { id: string; name: string };
+  bankAccount: { id: string; name: string } | null;
+  user: { id: string; name: string };
+}
+
+interface ExpensesReport {
+  date: string;
+  total: number;
+  expenses: ExpenseRecord[];
+}
+
 const TYPE_OPTIONS = [
   { value: "", label: "All Types" },
   { value: "BUY_IN", label: "Buy-in" },
@@ -136,6 +160,14 @@ export default function TransactionsPage() {
   const [tipsReport, setTipsReport] = useState<TipsReport | null>(null);
   const [rakeReport, setRakeReport] = useState<RakeReport | null>(null);
 
+  // Expenses state
+  const [expensesReport, setExpensesReport] = useState<ExpensesReport | null>(null);
+  const [expenseTypes, setExpenseTypes] = useState<ExpenseTypeOption[]>([]);
+  const [editExpenseModalOpen, setEditExpenseModalOpen] = useState(false);
+  const [editExpense, setEditExpense] = useState<ExpenseRecord | null>(null);
+  const [editExpenseForm, setEditExpenseForm] = useState({ expenseTypeId: "", amount: "", paymentMethod: "CASH", bankAccountId: "", notes: "" });
+  const [editExpenseSubmitting, setEditExpenseSubmitting] = useState(false);
+
   // Edit modal state
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editTx, setEditTx] = useState<TxRecord | null>(null);
@@ -148,6 +180,8 @@ export default function TransactionsPage() {
   useEffect(() => {
     fetch("/api/tips").then(r => r.json()).then(setTipsReport).catch(() => {});
     fetch("/api/rake-collections").then(r => r.json()).then(setRakeReport).catch(() => {});
+    fetch("/api/expenses").then(r => r.json()).then(setExpensesReport).catch(() => {});
+    fetch("/api/expense-types").then(r => r.json()).then(setExpenseTypes).catch(() => {});
   }, []);
 
   const fetchTransactions = useCallback(async () => {
@@ -218,6 +252,53 @@ export default function TransactionsPage() {
   const editAmount = parseFloat(editForm.amount) || 0;
   const gelPreview = selectedCurrency ? editAmount * selectedCurrency.exchangeRate : editAmount;
   const showGelPreview = selectedCurrency && !selectedCurrency.isBase;
+
+  function openEditExpenseModal(exp: ExpenseRecord) {
+    setEditExpense(exp);
+    setEditExpenseForm({
+      expenseTypeId: exp.expenseType.id,
+      amount: exp.amount.toString(),
+      paymentMethod: exp.paymentMethod || "CASH",
+      bankAccountId: exp.bankAccount?.id || "",
+      notes: exp.notes || "",
+    });
+    setEditExpenseModalOpen(true);
+    if (bankAccounts.length === 0) {
+      fetch("/api/bank-accounts").then(r => r.json()).then((list: BankAccountOption[]) => setBankAccounts(list.filter(b => b.active))).catch(() => {});
+    }
+  }
+
+  async function handleEditExpenseSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editExpense) return;
+    setEditExpenseSubmitting(true);
+    try {
+      const res = await fetch(`/api/expenses/${editExpense.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          expenseTypeId: editExpenseForm.expenseTypeId,
+          amount: parseFloat(editExpenseForm.amount),
+          paymentMethod: editExpenseForm.paymentMethod,
+          bankAccountId: editExpenseForm.paymentMethod === "BANK" ? editExpenseForm.bankAccountId : null,
+          notes: editExpenseForm.notes,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        setToast({ message: err.error || "Failed to update", type: "error" });
+        setEditExpenseSubmitting(false);
+        return;
+      }
+      setToast({ message: "Expense updated", type: "success" });
+      setEditExpenseModalOpen(false);
+      setEditExpense(null);
+      fetch("/api/expenses").then(r => r.json()).then(setExpensesReport).catch(() => {});
+    } catch {
+      setToast({ message: "Update failed", type: "error" });
+    }
+    setEditExpenseSubmitting(false);
+  }
 
   // Client-side player name filter
   const filtered = playerFilter
@@ -628,6 +709,199 @@ export default function TransactionsPage() {
             </table>
           </div>
         </div>
+      )}
+
+      {/* Recent Expenses */}
+      {expensesReport && expensesReport.expenses.length > 0 && (
+        <div className="mt-8" style={{ animation: "floatUp 0.4s ease-out" }}>
+          <div className="mb-4">
+            <h2 className="text-lg font-bold tracking-wide" style={{ fontFamily: "var(--font-display)" }}>Recent Expenses</h2>
+            <p className="mt-1 text-sm text-muted">
+              {expensesReport.expenses.length} expense{expensesReport.expenses.length !== 1 ? "s" : ""} — Total: <span style={{ color: "var(--danger)" }}>{formatMoney(expensesReport.total)}</span>
+            </p>
+          </div>
+          <div className="rounded-xl border border-card-border bg-card-bg/60 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-card-border">
+                  <th className="text-left px-5 py-3 text-[10px] font-semibold tracking-wider uppercase text-muted">Date/Time</th>
+                  <th className="text-left px-5 py-3 text-[10px] font-semibold tracking-wider uppercase text-muted">Type</th>
+                  <th className="text-right px-5 py-3 text-[10px] font-semibold tracking-wider uppercase text-muted">Amount</th>
+                  <th className="text-left px-5 py-3 text-[10px] font-semibold tracking-wider uppercase text-muted">Payment</th>
+                  <th className="text-left px-5 py-3 text-[10px] font-semibold tracking-wider uppercase text-muted">Notes</th>
+                  <th className="text-left px-5 py-3 text-[10px] font-semibold tracking-wider uppercase text-muted">Cashier</th>
+                  <th className="text-center px-3 py-3 text-[10px] font-semibold tracking-wider uppercase text-muted w-16">Edit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {expensesReport.expenses.map(exp => (
+                  <tr key={exp.id} className="border-b border-card-border/50 hover:bg-card-border/20 transition-colors">
+                    <td className="px-5 py-3 text-muted text-xs whitespace-nowrap">
+                      {new Date(exp.createdAt).toLocaleDateString()}<br />
+                      <span className="text-[10px]">{new Date(exp.createdAt).toLocaleTimeString()}</span>
+                    </td>
+                    <td className="px-5 py-3">
+                      <span
+                        className="inline-block rounded px-2 py-0.5 text-[10px] font-semibold tracking-wider uppercase"
+                        style={{ color: "var(--danger)", backgroundColor: "rgba(199, 69, 69, 0.15)" }}
+                      >
+                        {exp.expenseType.name}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-right font-bold" style={{ color: "var(--danger)" }}>
+                      -{formatMoney(exp.amount)}
+                    </td>
+                    <td className="px-5 py-3 text-xs text-muted">
+                      {exp.paymentMethod === "BANK" ? (exp.bankAccount ? `Bank - ${exp.bankAccount.name}` : "Bank") : "Cash"}
+                    </td>
+                    <td className="px-5 py-3 text-muted text-xs max-w-[200px] truncate">{exp.notes || "\u2014"}</td>
+                    <td className="px-5 py-3 text-muted text-xs">{exp.user.name}</td>
+                    <td className="px-3 py-3 text-center">
+                      <button
+                        onClick={() => openEditExpenseModal(exp)}
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-card-border/50 text-muted hover:text-accent-gold hover:border-accent-gold/30 transition-all cursor-pointer"
+                        title="Edit expense"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                          <path d="m15 5 4 4" />
+                        </svg>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Expense Modal */}
+      {editExpenseModalOpen && editExpense && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onMouseDown={(e) => { if (e.target === e.currentTarget) { setEditExpenseModalOpen(false); setEditExpense(null); } }}>
+          <div className="w-full max-w-lg rounded-xl border border-card-border bg-card-bg shadow-2xl" style={{ animation: "floatUp 0.2s ease-out" }}>
+            <div className="border-b border-card-border px-6 py-4">
+              <h2 className="text-lg font-bold tracking-wide" style={{ fontFamily: "var(--font-display)", color: "var(--accent-gold)" }}>
+                Edit Expense
+              </h2>
+              <p className="text-xs text-muted mt-0.5">
+                {editExpense.expenseType.name} &middot; {new Date(editExpense.createdAt).toLocaleDateString()}
+              </p>
+            </div>
+            <form onSubmit={handleEditExpenseSubmit} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium tracking-wider uppercase text-muted mb-1.5">Expense Type</label>
+                  <select
+                    value={editExpenseForm.expenseTypeId}
+                    onChange={e => setEditExpenseForm({ ...editExpenseForm, expenseTypeId: e.target.value })}
+                    required
+                    className="w-full rounded-lg border border-card-border bg-card-bg px-4 py-2.5 text-sm outline-none cursor-pointer focus:border-accent-gold/50"
+                    style={{ color: "var(--foreground)" }}
+                  >
+                    {expenseTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium tracking-wider uppercase text-muted mb-1.5">Amount</label>
+                  <input
+                    type="number"
+                    value={editExpenseForm.amount}
+                    onChange={e => setEditExpenseForm({ ...editExpenseForm, amount: e.target.value })}
+                    required
+                    min="0.01"
+                    step="0.01"
+                    className="w-full rounded-lg border border-card-border bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent-gold/50"
+                    style={{ color: "var(--foreground)" }}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium tracking-wider uppercase text-muted mb-1.5">Payment Method</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditExpenseForm({ ...editExpenseForm, paymentMethod: "CASH", bankAccountId: "" })}
+                    className="flex-1 rounded-lg py-2 text-sm font-medium tracking-wider uppercase transition-all cursor-pointer"
+                    style={editExpenseForm.paymentMethod === "CASH" ? {
+                      background: "rgba(13, 74, 46, 0.25)",
+                      border: "1px solid rgba(26, 107, 69, 0.5)",
+                      color: "var(--felt-green-light)",
+                    } : {
+                      background: "transparent",
+                      border: "1px solid var(--card-border)",
+                      color: "var(--muted)",
+                    }}
+                  >
+                    Cash
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditExpenseForm({ ...editExpenseForm, paymentMethod: "BANK" })}
+                    className="flex-1 rounded-lg py-2 text-sm font-medium tracking-wider uppercase transition-all cursor-pointer"
+                    style={editExpenseForm.paymentMethod === "BANK" ? {
+                      background: "rgba(13, 74, 46, 0.25)",
+                      border: "1px solid rgba(26, 107, 69, 0.5)",
+                      color: "var(--felt-green-light)",
+                    } : {
+                      background: "transparent",
+                      border: "1px solid var(--card-border)",
+                      color: "var(--muted)",
+                    }}
+                  >
+                    Bank
+                  </button>
+                </div>
+              </div>
+              {editExpenseForm.paymentMethod === "BANK" && (
+                <div>
+                  <label className="block text-xs font-medium tracking-wider uppercase text-muted mb-1.5">Bank Account</label>
+                  <select
+                    value={editExpenseForm.bankAccountId}
+                    onChange={e => setEditExpenseForm({ ...editExpenseForm, bankAccountId: e.target.value })}
+                    required
+                    className="w-full rounded-lg border border-card-border bg-card-bg px-4 py-2.5 text-sm outline-none cursor-pointer focus:border-accent-gold/50"
+                    style={{ color: "var(--foreground)" }}
+                  >
+                    <option value="">Select bank account...</option>
+                    {bankAccounts.map(ba => (
+                      <option key={ba.id} value={ba.id}>{ba.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-xs font-medium tracking-wider uppercase text-muted mb-1.5">Notes</label>
+                <textarea
+                  value={editExpenseForm.notes}
+                  onChange={e => setEditExpenseForm({ ...editExpenseForm, notes: e.target.value })}
+                  rows={2}
+                  placeholder="Optional notes..."
+                  className="w-full rounded-lg border border-card-border bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent-gold/50 resize-none"
+                  style={{ color: "var(--foreground)" }}
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={editExpenseSubmitting}
+                  className="flex-1 rounded-lg py-2.5 text-sm font-semibold tracking-wider uppercase cursor-pointer disabled:opacity-50"
+                  style={{ background: "linear-gradient(135deg, var(--felt-green), var(--felt-green-light))", color: "var(--foreground)" }}
+                >
+                  {editExpenseSubmitting ? "Saving..." : "Update"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setEditExpenseModalOpen(false); setEditExpense(null); }}
+                  className="flex-1 rounded-lg border border-card-border py-2.5 text-sm font-medium tracking-wider uppercase text-muted hover:text-foreground transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

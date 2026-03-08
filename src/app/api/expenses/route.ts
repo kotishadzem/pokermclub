@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   const { error, session } = await requireRole(["ADMIN", "CASHIER"]);
   if (error) return error;
 
-  const { expenseTypeId, amount, paymentMethod, bankAccountId, notes } = await req.json();
+  const { expenseTypeId, amount, paymentMethod, bankAccountId, notes, chipBreakdown } = await req.json();
 
   if (!expenseTypeId || !amount || amount <= 0) {
     return NextResponse.json({ error: "Expense type and positive amount required" }, { status: 400 });
@@ -118,6 +118,7 @@ export async function POST(req: NextRequest) {
       paymentMethod: paymentMethod === "BANK" ? "BANK" : "CASH",
       bankAccountId: paymentMethod === "BANK" ? bankAccountId : null,
       notes: notes || null,
+      chipBreakdown: chipBreakdown && Array.isArray(chipBreakdown) && chipBreakdown.length > 0 ? chipBreakdown : undefined,
       userId: (session!.user as { id: string }).id,
     },
     include: {

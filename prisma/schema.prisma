@@ -266,10 +266,11 @@ model Chip {
 
 // ── Expense Types ──
 model ExpenseType {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  name       String   @unique
+  isInternal Boolean  @default(false)
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
 
   expenses Expense[]
 }
@@ -284,6 +285,7 @@ model Expense {
   bankAccountId String?
   bankAccount   BankAccount?  @relation(fields: [bankAccountId], references: [id])
   notes         String?
+  chipBreakdown Json?
   userId        String
   user          User          @relation(fields: [userId], references: [id])
   createdAt     DateTime      @default(now())

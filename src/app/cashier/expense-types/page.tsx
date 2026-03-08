@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 interface ExpenseType {
   id: string;
   name: string;
+  isInternal: boolean;
   active: boolean;
   createdAt: string;
 }
@@ -38,6 +39,7 @@ export default function ExpenseTypesPage() {
   const [confirmDelete, setConfirmDelete] = useState<ExpenseType | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [name, setName] = useState("");
+  const [isInternal, setIsInternal] = useState(false);
 
   const fetchItems = useCallback(async () => {
     const res = await fetch("/api/expense-types");
@@ -50,12 +52,14 @@ export default function ExpenseTypesPage() {
   function openCreate() {
     setEditItem(null);
     setName("");
+    setIsInternal(false);
     setModalOpen(true);
   }
 
   function openEdit(item: ExpenseType) {
     setEditItem(item);
     setName(item.name);
+    setIsInternal(item.isInternal);
     setModalOpen(true);
   }
 
@@ -67,7 +71,7 @@ export default function ExpenseTypesPage() {
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, isInternal }),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -120,15 +124,16 @@ export default function ExpenseTypesPage() {
           <thead>
             <tr className="border-b border-card-border">
               <th className="text-left px-5 py-3 text-xs font-semibold tracking-wider uppercase text-muted">Name</th>
+              <th className="text-center px-5 py-3 text-xs font-semibold tracking-wider uppercase text-muted">Internal</th>
               <th className="text-right px-5 py-3 text-xs font-semibold tracking-wider uppercase text-muted">Created</th>
               <th className="text-right px-5 py-3 text-xs font-semibold tracking-wider uppercase text-muted">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={3} className="px-5 py-8 text-center text-muted">Loading...</td></tr>
+              <tr><td colSpan={4} className="px-5 py-8 text-center text-muted">Loading...</td></tr>
             ) : items.length === 0 ? (
-              <tr><td colSpan={3} className="px-5 py-8 text-center text-muted">No expense types added yet</td></tr>
+              <tr><td colSpan={4} className="px-5 py-8 text-center text-muted">No expense types added yet</td></tr>
             ) : (
               items.map((item) => (
                 <tr key={item.id} className="border-b border-card-border/50 hover:bg-card-border/20 transition-colors">
@@ -137,6 +142,13 @@ export default function ExpenseTypesPage() {
                       <span className="text-base" style={{ color: "var(--danger)" }}>◇</span>
                       <span className="font-medium">{item.name}</span>
                     </div>
+                  </td>
+                  <td className="px-5 py-3 text-center">
+                    {item.isInternal && (
+                      <span className="inline-block rounded px-2 py-0.5 text-[10px] font-semibold tracking-wider uppercase" style={{ color: "var(--accent-gold)", backgroundColor: "rgba(201, 168, 76, 0.15)" }}>
+                        Internal
+                      </span>
+                    )}
                   </td>
                   <td className="px-5 py-3 text-right text-xs text-muted">
                     {new Date(item.createdAt).toLocaleDateString()}
@@ -175,6 +187,18 @@ export default function ExpenseTypesPage() {
                   autoFocus
                 />
               </div>
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={isInternal}
+                  onChange={(e) => setIsInternal(e.target.checked)}
+                  className="w-4 h-4 rounded border-card-border cursor-pointer accent-[var(--accent-gold)]"
+                />
+                <div>
+                  <span className="text-sm font-medium text-foreground">Internal expense</span>
+                  <p className="text-[10px] text-muted">Amount calculated from chip breakdown</p>
+                </div>
+              </label>
               <div className="flex gap-3 pt-2">
                 <button type="submit" className="flex-1 rounded-lg py-2.5 text-sm font-semibold tracking-wider uppercase cursor-pointer" style={{ background: "linear-gradient(135deg, var(--felt-green), var(--felt-green-light))", color: "var(--foreground)" }}>
                   {editItem ? "Update" : "Add"}
