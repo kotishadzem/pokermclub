@@ -1,5 +1,5 @@
 export const CURRENCY_SYMBOLS: Record<string, string> = {
-  GEL: "\u10DA",
+  GEL: "GEL",
   USD: "$",
   EUR: "\u20AC",
   GBP: "\u00A3",

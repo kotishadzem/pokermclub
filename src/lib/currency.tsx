@@ -9,7 +9,7 @@ export interface CurrencyInfo {
 }
 
 export const CURRENCIES: CurrencyInfo[] = [
-  { code: "GEL", symbol: "\u10DA", name: "Georgian Lari" },
+  { code: "GEL", symbol: "GEL", name: "Georgian Lari" },
   { code: "USD", symbol: "$", name: "US Dollar" },
   { code: "EUR", symbol: "\u20AC", name: "Euro" },
   { code: "GBP", symbol: "\u00A3", name: "British Pound" },
@@ -27,7 +27,7 @@ const defaultCurrency = CURRENCY_MAP.GEL;
 
 const CurrencyContext = createContext<CurrencyContextValue>({
   currency: defaultCurrency,
-  formatMoney: (amount) => `${defaultCurrency.symbol}${amount.toFixed(2)}`,
+  formatMoney: (amount) => `${defaultCurrency.symbol}${defaultCurrency.symbol.length > 1 ? " " : ""}${amount.toFixed(2)}`,
   setCurrency: async () => {},
 });
 
@@ -45,7 +45,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const formatMoney = useCallback(
-    (amount: number) => `${currency.symbol}${amount.toFixed(2)}`,
+    (amount: number) => `${currency.symbol}${currency.symbol.length > 1 ? " " : ""}${amount.toFixed(2)}`,
     [currency.symbol],
   );
 
