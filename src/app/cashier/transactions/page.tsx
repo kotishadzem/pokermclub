@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { useSession } from "next-auth/react";
 import { useCurrency } from "@/lib/currency";
 
 interface TxRecord {
@@ -149,6 +150,8 @@ function Toast({ message, type, onClose }: { message: string; type: "success" | 
 }
 
 export default function TransactionsPage() {
+  const { data: session } = useSession();
+  const currentUserId = (session?.user as { id?: string })?.id;
   const { formatMoney } = useCurrency();
   const [transactions, setTransactions] = useState<TxRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -437,16 +440,20 @@ export default function TransactionsPage() {
                   <td className="px-5 py-3 text-muted text-xs max-w-[200px] truncate">{tx.notes || "\u2014"}</td>
                   <td className="px-5 py-3 text-muted text-xs">{tx.user.name}</td>
                   <td className="px-3 py-3 text-center">
-                    <button
-                      onClick={() => openEditModal(tx)}
-                      className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-card-border/50 text-muted hover:text-accent-gold hover:border-accent-gold/30 transition-all cursor-pointer"
-                      title="Edit transaction"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                        <path d="m15 5 4 4" />
-                      </svg>
-                    </button>
+                    {tx.user.id === currentUserId ? (
+                      <button
+                        onClick={() => openEditModal(tx)}
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-card-border/50 text-muted hover:text-accent-gold hover:border-accent-gold/30 transition-all cursor-pointer"
+                        title="Edit transaction"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                          <path d="m15 5 4 4" />
+                        </svg>
+                      </button>
+                    ) : (
+                      <span className="text-[10px] text-muted/40">&mdash;</span>
+                    )}
                   </td>
                 </tr>
               ))
@@ -757,16 +764,20 @@ export default function TransactionsPage() {
                     <td className="px-5 py-3 text-muted text-xs max-w-[200px] truncate">{exp.notes || "\u2014"}</td>
                     <td className="px-5 py-3 text-muted text-xs">{exp.user.name}</td>
                     <td className="px-3 py-3 text-center">
-                      <button
-                        onClick={() => openEditExpenseModal(exp)}
-                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-card-border/50 text-muted hover:text-accent-gold hover:border-accent-gold/30 transition-all cursor-pointer"
-                        title="Edit expense"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                          <path d="m15 5 4 4" />
-                        </svg>
-                      </button>
+                      {exp.user.id === currentUserId ? (
+                        <button
+                          onClick={() => openEditExpenseModal(exp)}
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-lg border border-card-border/50 text-muted hover:text-accent-gold hover:border-accent-gold/30 transition-all cursor-pointer"
+                          title="Edit expense"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                            <path d="m15 5 4 4" />
+                          </svg>
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-muted/40">&mdash;</span>
+                      )}
                     </td>
                   </tr>
                 ))}

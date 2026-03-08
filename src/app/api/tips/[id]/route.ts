@@ -7,7 +7,7 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requireRole(["ADMIN", "CASHIER"]);
+  const { error, session } = await requireRole(["ADMIN", "CASHIER"]);
   if (error) return error;
 
   const { id } = await params;
@@ -17,6 +17,11 @@ export async function PUT(
   const original = await prisma.tipCollection.findUnique({ where: { id } });
   if (!original) {
     return NextResponse.json({ error: "Tip collection not found" }, { status: 404 });
+  }
+
+  const currentUserId = (session!.user as { id: string }).id;
+  if (original.userId !== currentUserId) {
+    return NextResponse.json({ error: "You can only edit your own records" }, { status: 403 });
   }
 
   const newAmount = amount ?? original.amount;

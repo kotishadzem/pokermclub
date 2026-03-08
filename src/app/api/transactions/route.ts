@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma/client";
 import { requireRole } from "@/lib/api-auth";
 import { bumpVersion } from "@/lib/version";
 import { PaymentSplit, getTransactionChannelAmount } from "@/lib/payment-splits";
@@ -206,7 +207,7 @@ export async function POST(req: NextRequest) {
       exchangeRate,
       amountInGel,
       chipBreakdown: chipBreakdown && Array.isArray(chipBreakdown) && chipBreakdown.length > 0 ? chipBreakdown : undefined,
-      paymentSplits: paymentSplits && paymentSplits.length > 0 ? paymentSplits : undefined,
+      paymentSplits: paymentSplits && paymentSplits.length > 0 ? (paymentSplits as unknown as Prisma.InputJsonValue) : undefined,
       userId: (session!.user as { id: string }).id,
     },
     include: {

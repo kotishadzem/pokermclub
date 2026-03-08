@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma/client";
 import { requireRole } from "@/lib/api-auth";
 import { bumpVersion } from "@/lib/version";
 import { NextRequest, NextResponse } from "next/server";
@@ -7,7 +8,7 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requireRole(["ADMIN", "CASHIER"]);
+  const { error, session } = await requireRole(["ADMIN", "CASHIER"]);
   if (error) return error;
 
   const { id } = await params;
@@ -17,6 +18,11 @@ export async function PUT(
   const original = await prisma.expense.findUnique({ where: { id } });
   if (!original) {
     return NextResponse.json({ error: "Expense not found" }, { status: 404 });
+  }
+
+  const currentUserId = (session!.user as { id: string }).id;
+  if (original.userId !== currentUserId) {
+    return NextResponse.json({ error: "You can only edit your own records" }, { status: 403 });
   }
 
   const newAmount = amount ?? original.amount;
@@ -104,7 +110,7 @@ export async function PUT(
       paymentMethod: newPaymentMethod === "BANK" ? "BANK" : "CASH",
       bankAccountId: newBankAccountId,
       notes: notes !== undefined ? (notes || null) : original.notes,
-      ...(chipBreakdown !== undefined ? { chipBreakdown: chipBreakdown && Array.isArray(chipBreakdown) && chipBreakdown.length > 0 ? chipBreakdown : null } : {}),
+      ...(chipBreakdown !== undefined ? { chipBreakdown: chipBreakdown && Array.isArray(chipBreakdown) && chipBreakdown.length > 0 ? chipBreakdown : Prisma.DbNull } : {}),
     },
     include: {
       expenseType: { select: { id: true, name: true } },
@@ -121,10 +127,21 @@ export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requireRole(["ADMIN", "CASHIER"]);
+  const { error, session } = await requireRole(["ADMIN", "CASHIER"]);
   if (error) return error;
 
   const { id } = await params;
+
+  const original = await prisma.expense.findUnique({ where: { id } });
+  if (!original) {
+    return NextResponse.json({ error: "Expense not found" }, { status: 404 });
+  }
+
+  const currentUserId = (session!.user as { id: string }).id;
+  if (original.userId !== currentUserId) {
+    return NextResponse.json({ error: "You can only delete your own records" }, { status: 403 });
+  }
+
   await prisma.expense.delete({ where: { id } });
 
   bumpVersion();

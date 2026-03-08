@@ -39,7 +39,7 @@ export async function GET() {
   // BUY_IN: chips leave cashier (-1)
   // CASH_OUT: chips enter cashier (+1)
   const transactions = await prisma.transaction.findMany({
-    where: { chipBreakdown: { not: null } },
+    where: { type: { in: ["BUY_IN", "CASH_OUT"] } },
     select: { type: true, chipBreakdown: true },
   });
   for (const tx of transactions) {
@@ -49,7 +49,6 @@ export async function GET() {
 
   // Rake collections: chips enter cashier (+1)
   const rakeCollections = await prisma.rakeCollection.findMany({
-    where: { chipBreakdown: { not: null } },
     select: { chipBreakdown: true },
   });
   for (const rc of rakeCollections) {
@@ -58,7 +57,6 @@ export async function GET() {
 
   // Tip collections: chips enter cashier (+1)
   const tipCollections = await prisma.tipCollection.findMany({
-    where: { chipBreakdown: { not: null } },
     select: { chipBreakdown: true },
   });
   for (const tc of tipCollections) {
@@ -67,7 +65,6 @@ export async function GET() {
 
   // Internal expenses: chips leave cashier (-1)
   const expenses = await prisma.expense.findMany({
-    where: { chipBreakdown: { not: null } },
     select: { chipBreakdown: true },
   });
   for (const exp of expenses) {

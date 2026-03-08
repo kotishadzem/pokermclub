@@ -973,6 +973,7 @@ export default function CashierDashboard() {
                     )}
                     <p className="text-[10px] text-muted">
                       {new Date(tx.createdAt).toLocaleString()}
+                      {tx.user?.name && <span className="ml-1">· {tx.user.name}</span>}
                     </p>
                   </div>
                 </div>

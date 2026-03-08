@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma/client";
 import { requireRole } from "@/lib/api-auth";
 import { bumpVersion } from "@/lib/version";
 import { PaymentSplit, getTransactionChannelAmount } from "@/lib/payment-splits";
@@ -8,7 +9,7 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requireRole(["ADMIN", "CASHIER"]);
+  const { error, session } = await requireRole(["ADMIN", "CASHIER"]);
   if (error) return error;
 
   const { id } = await params;
@@ -19,6 +20,12 @@ export async function PUT(
   const original = await prisma.transaction.findUnique({ where: { id } });
   if (!original) {
     return NextResponse.json({ error: "Transaction not found" }, { status: 404 });
+  }
+
+  // Only the author can edit their own transaction
+  const currentUserId = (session!.user as { id: string }).id;
+  if (original.userId !== currentUserId) {
+    return NextResponse.json({ error: "You can only edit your own transactions" }, { status: 403 });
   }
 
   const validTypes = ["BUY_IN", "CASH_OUT", "DEPOSIT", "WITHDRAWAL", "RAKEBACK_PAYOUT"];
@@ -73,7 +80,7 @@ export async function PUT(
     }
   } else if (rawSplits === undefined && original.paymentSplits) {
     // Keep original splits but recalculate amounts if amount/currency changed
-    const origSplits = original.paymentSplits as PaymentSplit[];
+    const origSplits = original.paymentSplits as unknown as PaymentSplit[];
     const origTotal = origSplits.reduce((sum, s) => sum + s.amountInGel, 0);
     if (Math.abs(origTotal - amountInGel) < 0.01) {
       newSplits = origSplits;
@@ -176,8 +183,8 @@ export async function PUT(
       paymentMethod: legacyPaymentMethod as "CASH" | "BANK",
       bankAccountId: legacyBankAccountId,
       notes: notes !== undefined ? (notes || null) : original.notes,
-      ...(chipBreakdown !== undefined ? { chipBreakdown: chipBreakdown && Array.isArray(chipBreakdown) && chipBreakdown.length > 0 ? chipBreakdown : null } : {}),
-      paymentSplits: newSplits && newSplits.length > 0 ? newSplits : null,
+      ...(chipBreakdown !== undefined ? { chipBreakdown: chipBreakdown && Array.isArray(chipBreakdown) && chipBreakdown.length > 0 ? chipBreakdown : Prisma.DbNull } : {}),
+      paymentSplits: newSplits && newSplits.length > 0 ? (newSplits as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
     },
     include: {
       player: { select: { id: true, firstName: true, lastName: true } },
