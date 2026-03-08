@@ -195,7 +195,12 @@ export default function CashierDashboard() {
   const [rakeTableId, setRakeTableId] = useState("");
   const [rakeAmount, setRakeAmount] = useState("");
   const [rakeNotes, setRakeNotes] = useState("");
+  const [rakeChipQuantities, setRakeChipQuantities] = useState<Record<string, number>>({});
   const [submittingRake, setSubmittingRake] = useState(false);
+  const [tipChipQuantities, setTipChipQuantities] = useState<Record<string, number>>({});
+
+  // Chip inventory state
+  const [chipInventory, setChipInventory] = useState<{ chipId: string; denomination: number; color: string | null; total: number; cashier: number; field: number }[]>([]);
 
   // Expense state
   const [expenseTypes, setExpenseTypes] = useState<ExpenseTypeOption[]>([]);
@@ -210,16 +215,19 @@ export default function CashierDashboard() {
 
   // Fetch today's summary + tips (live-polled)
   const fetchReport = useCallback(async () => {
-    const [reportRes, tipsRes, rakeRes, expensesRes] = await Promise.all([
+    const [reportRes, tipsRes, rakeRes, expensesRes, inventoryRes] = await Promise.all([
       fetch("/api/transactions/reports"),
       fetch("/api/tips"),
       fetch("/api/rake-collections"),
       fetch("/api/expenses"),
+      fetch("/api/chips/inventory"),
     ]);
     setDayReport(await reportRes.json());
     setTipsReport(await tipsRes.json());
     setRakeReport(await rakeRes.json());
     setExpensesReport(await expensesRes.json());
+    const invData = await inventoryRes.json();
+    if (invData.chips) setChipInventory(invData.chips);
   }, []);
 
   useLiveData(fetchReport, 5000);
@@ -340,12 +348,20 @@ export default function CashierDashboard() {
           tableId: tipTableId,
           amount: parseFloat(tipAmount),
           notes: tipNotes || null,
+          chipBreakdown: hasTipChipEntries ? chips.filter(c => (tipChipQuantities[c.id] || 0) > 0).map(c => ({
+            chipId: c.id,
+            denomination: c.denomination,
+            color: c.color,
+            quantity: tipChipQuantities[c.id],
+            subtotal: c.denomination * tipChipQuantities[c.id],
+          })) : null,
         }),
       });
       if (res.ok) {
         setToast({ message: `Tip of ${formatMoney(parseFloat(tipAmount))} collected`, type: "success" });
         setTipAmount("");
         setTipNotes("");
+        setTipChipQuantities({});
         // Refresh tips report
         fetch("/api/tips").then(r => r.json()).then(setTipsReport).catch(() => {});
       } else {
@@ -369,12 +385,20 @@ export default function CashierDashboard() {
           tableId: rakeTableId,
           amount: parseFloat(rakeAmount),
           notes: rakeNotes || null,
+          chipBreakdown: hasRakeChipEntries ? chips.filter(c => (rakeChipQuantities[c.id] || 0) > 0).map(c => ({
+            chipId: c.id,
+            denomination: c.denomination,
+            color: c.color,
+            quantity: rakeChipQuantities[c.id],
+            subtotal: c.denomination * rakeChipQuantities[c.id],
+          })) : null,
         }),
       });
       if (res.ok) {
         setToast({ message: `Rake of ${formatMoney(parseFloat(rakeAmount))} collected`, type: "success" });
         setRakeAmount("");
         setRakeNotes("");
+        setRakeChipQuantities({});
         fetch("/api/rake-collections").then(r => r.json()).then(setRakeReport).catch(() => {});
       } else {
         const err = await res.json();
@@ -384,6 +408,30 @@ export default function CashierDashboard() {
       setToast({ message: "Rake collection failed", type: "error" });
     }
     setSubmittingRake(false);
+  }
+
+  // Rake chip breakdown helpers
+  const rakeChipTotal = chips.reduce((sum, c) => sum + c.denomination * (rakeChipQuantities[c.id] || 0), 0);
+  const hasRakeChipEntries = Object.values(rakeChipQuantities).some(q => q > 0);
+
+  function setRakeChipQty(chipId: string, qty: number) {
+    const newQ = { ...rakeChipQuantities, [chipId]: Math.max(0, qty) };
+    setRakeChipQuantities(newQ);
+    const total = chips.reduce((sum, c) => sum + c.denomination * (newQ[c.id] || 0), 0);
+    if (total > 0) setRakeAmount(total.toString());
+    else setRakeAmount("");
+  }
+
+  // Tip chip breakdown helpers
+  const tipChipTotal = chips.reduce((sum, c) => sum + c.denomination * (tipChipQuantities[c.id] || 0), 0);
+  const hasTipChipEntries = Object.values(tipChipQuantities).some(q => q > 0);
+
+  function setTipChipQty(chipId: string, qty: number) {
+    const newQ = { ...tipChipQuantities, [chipId]: Math.max(0, qty) };
+    setTipChipQuantities(newQ);
+    const total = chips.reduce((sum, c) => sum + c.denomination * (newQ[c.id] || 0), 0);
+    if (total > 0) setTipAmount(total.toString());
+    else setTipAmount("");
   }
 
   // Expense chip breakdown helpers
@@ -912,6 +960,52 @@ export default function CashierDashboard() {
                 ))}
               </select>
             </div>
+            {chips.length > 0 && (
+              <div>
+                <label className="block text-xs text-muted mb-1">Chip Breakdown</label>
+                <div className="rounded-lg border border-card-border/50 overflow-hidden max-h-48 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-card-border/30">
+                        <th className="text-left px-3 py-1.5 text-muted">Chip</th>
+                        <th className="text-center px-3 py-1.5 text-muted">Qty</th>
+                        <th className="text-right px-3 py-1.5 text-muted">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {chips.map(c => {
+                        const qty = rakeChipQuantities[c.id] || 0;
+                        const hex = c.color ? (CHIP_COLOR_HEX[c.color] || "#6b7c74") : "#6b7c74";
+                        return (
+                          <tr key={c.id} className="border-b border-card-border/20">
+                            <td className="px-3 py-1.5">
+                              <div className="flex items-center gap-2">
+                                <span className="w-5 h-5 rounded-full inline-flex items-center justify-center text-[8px] font-bold border" style={{ backgroundColor: hex, borderColor: "rgba(255,255,255,0.2)", color: c.color === "white" || c.color === "yellow" ? "#1a1a1a" : "#fff" }}>{c.denomination}</span>
+                                <span style={{ color: "var(--accent-gold)" }}>{formatMoney(c.denomination)}</span>
+                              </div>
+                            </td>
+                            <td className="px-3 py-1.5 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <button type="button" onClick={() => setRakeChipQty(c.id, qty - 1)} className="w-6 h-6 rounded border border-card-border text-muted hover:text-foreground cursor-pointer text-sm">-</button>
+                                <input type="number" min={0} value={qty || ""} onChange={e => setRakeChipQty(c.id, parseInt(e.target.value) || 0)} className="w-12 text-center rounded border border-card-border bg-transparent text-sm outline-none py-0.5" style={{ color: "var(--foreground)" }} />
+                                <button type="button" onClick={() => setRakeChipQty(c.id, qty + 1)} className="w-6 h-6 rounded border border-card-border text-muted hover:text-foreground cursor-pointer text-sm">+</button>
+                              </div>
+                            </td>
+                            <td className="px-3 py-1.5 text-right font-medium" style={{ color: qty > 0 ? "var(--foreground)" : "var(--muted)" }}>{qty > 0 ? formatMoney(c.denomination * qty) : "—"}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {hasRakeChipEntries && (
+                    <div className="flex justify-between px-3 py-2 border-t border-card-border/30 font-semibold text-xs">
+                      <span className="text-muted">Total:</span>
+                      <span style={{ color: "var(--accent-gold)" }}>{formatMoney(rakeChipTotal)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             <div>
               <label className="block text-xs text-muted mb-1">Amount ({currency.symbol})</label>
               <input
@@ -919,10 +1013,11 @@ export default function CashierDashboard() {
                 min={0.01}
                 step="0.01"
                 value={rakeAmount}
-                onChange={e => setRakeAmount(e.target.value)}
+                onChange={e => { if (!hasRakeChipEntries) setRakeAmount(e.target.value); }}
+                readOnly={hasRakeChipEntries}
                 placeholder="0.00"
                 className="w-full rounded-lg border border-card-border bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent-gold/50"
-                style={{ color: "var(--foreground)" }}
+                style={{ color: hasRakeChipEntries ? "var(--accent-gold)" : "var(--foreground)", opacity: hasRakeChipEntries ? 0.8 : 1 }}
               />
             </div>
             <div>
@@ -965,6 +1060,52 @@ export default function CashierDashboard() {
                 ))}
               </select>
             </div>
+            {chips.length > 0 && (
+              <div>
+                <label className="block text-xs text-muted mb-1">Chip Breakdown</label>
+                <div className="rounded-lg border border-card-border/50 overflow-hidden max-h-48 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-card-border/30">
+                        <th className="text-left px-3 py-1.5 text-muted">Chip</th>
+                        <th className="text-center px-3 py-1.5 text-muted">Qty</th>
+                        <th className="text-right px-3 py-1.5 text-muted">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {chips.map(c => {
+                        const qty = tipChipQuantities[c.id] || 0;
+                        const hex = c.color ? (CHIP_COLOR_HEX[c.color] || "#6b7c74") : "#6b7c74";
+                        return (
+                          <tr key={c.id} className="border-b border-card-border/20">
+                            <td className="px-3 py-1.5">
+                              <div className="flex items-center gap-2">
+                                <span className="w-5 h-5 rounded-full inline-flex items-center justify-center text-[8px] font-bold border" style={{ backgroundColor: hex, borderColor: "rgba(255,255,255,0.2)", color: c.color === "white" || c.color === "yellow" ? "#1a1a1a" : "#fff" }}>{c.denomination}</span>
+                                <span style={{ color: "var(--accent-gold)" }}>{formatMoney(c.denomination)}</span>
+                              </div>
+                            </td>
+                            <td className="px-3 py-1.5 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <button type="button" onClick={() => setTipChipQty(c.id, qty - 1)} className="w-6 h-6 rounded border border-card-border text-muted hover:text-foreground cursor-pointer text-sm">-</button>
+                                <input type="number" min={0} value={qty || ""} onChange={e => setTipChipQty(c.id, parseInt(e.target.value) || 0)} className="w-12 text-center rounded border border-card-border bg-transparent text-sm outline-none py-0.5" style={{ color: "var(--foreground)" }} />
+                                <button type="button" onClick={() => setTipChipQty(c.id, qty + 1)} className="w-6 h-6 rounded border border-card-border text-muted hover:text-foreground cursor-pointer text-sm">+</button>
+                              </div>
+                            </td>
+                            <td className="px-3 py-1.5 text-right font-medium" style={{ color: qty > 0 ? "var(--foreground)" : "var(--muted)" }}>{qty > 0 ? formatMoney(c.denomination * qty) : "—"}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {hasTipChipEntries && (
+                    <div className="flex justify-between px-3 py-2 border-t border-card-border/30 font-semibold text-xs">
+                      <span className="text-muted">Total:</span>
+                      <span style={{ color: "var(--accent-gold)" }}>{formatMoney(tipChipTotal)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             <div>
               <label className="block text-xs text-muted mb-1">Amount ({currency.symbol})</label>
               <input
@@ -972,10 +1113,11 @@ export default function CashierDashboard() {
                 min={0.01}
                 step="0.01"
                 value={tipAmount}
-                onChange={e => setTipAmount(e.target.value)}
+                onChange={e => { if (!hasTipChipEntries) setTipAmount(e.target.value); }}
+                readOnly={hasTipChipEntries}
                 placeholder="0.00"
                 className="w-full rounded-lg border border-card-border bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent-gold/50"
-                style={{ color: "var(--foreground)" }}
+                style={{ color: hasTipChipEntries ? "var(--accent-gold)" : "var(--foreground)", opacity: hasTipChipEntries ? 0.8 : 1 }}
               />
             </div>
             <div>
@@ -1180,6 +1322,63 @@ export default function CashierDashboard() {
           </div>
         </div>
       </div>
+
+      {/* ── Chip Inventory ── */}
+      {chipInventory.length > 0 && (
+        <div className="mt-6" style={{ animation: "floatUp 0.5s ease-out" }}>
+          <div className="rounded-xl border border-card-border bg-card-bg/60 overflow-hidden">
+            <div className="px-5 py-3 border-b border-card-border">
+              <h3 className="text-xs font-semibold tracking-wider uppercase text-muted">Chip Inventory</h3>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-card-border/40">
+                  <th className="text-left px-4 py-2 text-[10px] font-semibold tracking-wider uppercase text-muted">Chip</th>
+                  <th className="text-right px-4 py-2 text-[10px] font-semibold tracking-wider uppercase text-muted">Total</th>
+                  <th className="text-right px-4 py-2 text-[10px] font-semibold tracking-wider uppercase text-muted">Cashier</th>
+                  <th className="text-right px-4 py-2 text-[10px] font-semibold tracking-wider uppercase text-muted">Field</th>
+                </tr>
+              </thead>
+              <tbody>
+                {chipInventory.map(ci => {
+                  const hex = ci.color ? (CHIP_COLOR_HEX[ci.color] || "#6b7c74") : "#6b7c74";
+                  return (
+                    <tr key={ci.chipId} className="border-b border-card-border/30 hover:bg-card-border/10 transition-colors">
+                      <td className="px-4 py-2">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-6 h-6 rounded-full inline-flex items-center justify-center text-[8px] font-bold border"
+                            style={{
+                              backgroundColor: hex,
+                              borderColor: "rgba(255,255,255,0.2)",
+                              color: ci.color === "white" || ci.color === "yellow" ? "#1a1a1a" : "#fff",
+                            }}
+                          >
+                            {ci.denomination}
+                          </span>
+                          <span className="text-xs capitalize text-muted">{ci.color || "—"}</span>
+                          <span className="text-xs font-medium" style={{ color: "var(--accent-gold-dim)" }}>{formatMoney(ci.denomination)}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 text-right font-medium">{ci.total}</td>
+                      <td className="px-4 py-2 text-right font-medium" style={{ color: "var(--felt-green-light)" }}>{ci.cashier}</td>
+                      <td className="px-4 py-2 text-right font-medium" style={{ color: ci.field > 0 ? "var(--accent-gold)" : ci.field < 0 ? "var(--danger)" : "var(--muted)" }}>{ci.field}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-card-border">
+                  <td className="px-4 py-2 text-xs font-semibold tracking-wider uppercase text-muted">Total Value</td>
+                  <td className="px-4 py-2 text-right text-sm font-bold">{formatMoney(chipInventory.reduce((s, c) => s + c.total * c.denomination, 0))}</td>
+                  <td className="px-4 py-2 text-right text-sm font-bold" style={{ color: "var(--felt-green-light)" }}>{formatMoney(chipInventory.reduce((s, c) => s + c.cashier * c.denomination, 0))}</td>
+                  <td className="px-4 py-2 text-right text-sm font-bold" style={{ color: "var(--accent-gold)" }}>{formatMoney(chipInventory.reduce((s, c) => s + c.field * c.denomination, 0))}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Empty state */}
       {!selectedPlayer && (

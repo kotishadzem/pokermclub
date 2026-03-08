@@ -218,26 +218,28 @@ model OpeningBalance {
 
 // ── Tip Collections (cashier receives tips from dealer) ──
 model TipCollection {
-  id        String   @id @default(cuid())
-  tableId   String
-  table     Table    @relation(fields: [tableId], references: [id])
-  amount    Float
-  notes     String?
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  createdAt DateTime @default(now())
+  id            String   @id @default(cuid())
+  tableId       String
+  table         Table    @relation(fields: [tableId], references: [id])
+  amount        Float
+  notes         String?
+  chipBreakdown Json?
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  createdAt     DateTime @default(now())
 }
 
 // ── Rake Collections (cashier collects rake from table) ──
 model RakeCollection {
-  id        String   @id @default(cuid())
-  tableId   String
-  table     Table    @relation(fields: [tableId], references: [id])
-  amount    Float
-  notes     String?
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  createdAt DateTime @default(now())
+  id            String   @id @default(cuid())
+  tableId       String
+  table         Table    @relation(fields: [tableId], references: [id])
+  amount        Float
+  notes         String?
+  chipBreakdown Json?
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  createdAt     DateTime @default(now())
 }
 
 // ── Rake Tracking ──

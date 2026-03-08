@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   if (error) return error;
 
   const body = await req.json();
-  const { tableId, amount, notes } = body;
+  const { tableId, amount, notes, chipBreakdown } = body;
 
   if (!tableId || typeof amount !== "number" || amount <= 0) {
     return NextResponse.json(
@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
       tableId,
       amount,
       notes: notes || null,
+      chipBreakdown: chipBreakdown && Array.isArray(chipBreakdown) && chipBreakdown.length > 0 ? chipBreakdown : undefined,
       userId,
     },
     include: {
