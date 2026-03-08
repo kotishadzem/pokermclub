@@ -39,7 +39,7 @@ pokemclub/
 │   │   │   ├── player-statuses/# Player status configuration
 │   │   │   ├── bank-accounts/  # Bank account management
 │   │   │   ├── rakeback-config/# Rakeback % per player
-│   │   │   ├── opening-balances/# Daily opening balance configuration
+│   │   │   ├── opening-balances/# Daily opening balances + daily activity (transactions, rake, tips) with edit
 │   │   │   └── tables/         # Table CRUD management (admin)
 │   │   ├── pitboss/            # Pit Boss role pages
 │   │   │   ├── floor-plan/     # Graphical drag-drop floor plan
@@ -48,6 +48,7 @@ pokemclub/
 │   │   ├── cashier/            # Cashier role pages
 │   │   │   ├── dashboard/      # Channel cards, Rake/Tips/Balance summary, player search, tip collection form
 │   │   │   ├── transactions/   # Transaction history + filters + Recent Tips table
+│   │   │   ├── opening-balances/# Daily opening balances + daily activity (transactions, rake, tips) with edit
 │   │   │   └── reports/        # Daily financial reports
 │   │   ├── dealer/             # Dealer role pages
 │   │   │   └── table/          # Assigned table + rake recording
@@ -65,6 +66,7 @@ pokemclub/
 │   │       ├── transactions/   # Transaction CRUD + reports
 │   │       ├── waiting-list/   # Waiting list management
 │   │       ├── rake/           # Rake recording
+│   │       ├── rake-collections/ # Rake collections CRUD (cashier collects from table)
 │   │       ├── tips/           # Tip collections (cashier ← dealer)
 │   │       ├── rakeback/       # Rakeback calculation
 │   │       ├── dealer/         # Dealer's assigned table
@@ -149,9 +151,15 @@ pokemclub/
 - `POST /api/rake` — Record rake (pot amount + rake amount + tip amount)
 - `GET /api/rake?tableSessionId=` — Get rake history for session (includes totalTips)
 
+### Rake Collections
+- `POST /api/rake-collections` — Record rake collection. Body: `{ tableId, amount, notes? }`
+- `GET /api/rake-collections?date=` — Rake collections report for date (default: today). Returns `{ date, grandTotal, byTable: [{tableId, tableName, total, count}], collections: [...] }`
+- `PUT /api/rake-collections/[id]` — Edit rake collection (amount, tableId, notes). All fields optional, keeps original if omitted.
+
 ### Tips
 - `POST /api/tips` — Record tip collection (cashier receives tips from dealer). Body: `{ tableId, amount, notes? }`
 - `GET /api/tips?date=` — Tips report for date (default: today). Returns `{ date, grandTotal, byTable: [{tableId, tableName, total, count}], collections: [...] }`
+- `PUT /api/tips/[id]` — Edit tip collection (amount, tableId, notes). All fields optional, keeps original if omitted.
 
 ### Rakeback
 - `GET /api/rakeback?playerId=` — Calculate rakeback for player(s)
