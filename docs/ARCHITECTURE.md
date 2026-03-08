@@ -133,6 +133,7 @@ pokemclub/
 ### Transactions
 - `GET /api/transactions?type=&from=&to=&limit=` — List transactions with filters
 - `POST /api/transactions` — Create transaction (outgoing transactions check available balance: opening + in - out; returns 400 "Insufficient funds" if exceeded)
+- `PUT /api/transactions/[id]` — Edit transaction (amount, type, paymentMethod, bankAccountId, notes, currencyId). Recalculates amountInGel on currency change. Balance validation for outgoing types excludes the original transaction.
 - `GET /api/transactions/reports?date=` — Daily report with aggregates + per-channel breakdown (Cash, per-bank-account, Deposits). Each channel includes `opening`, `in`, `out`, `net`, and `balance` fields.
 
 ### Opening Balances
