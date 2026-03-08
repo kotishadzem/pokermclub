@@ -57,6 +57,18 @@ interface CurrencyOption {
   isBase: boolean;
 }
 
+interface ChipOption {
+  id: string;
+  denomination: number;
+  quantity: number;
+  color: string | null;
+}
+
+const CHIP_COLOR_HEX: Record<string, string> = {
+  white: "#e8e8e8", red: "#c74545", blue: "#3b6fc4", green: "#1a6b45",
+  black: "#2a2a2a", purple: "#7b4bb3", yellow: "#c9a84c", orange: "#d4802a", pink: "#d45c8c",
+};
+
 interface PlayerOption {
   id: string;
   firstName: string;
@@ -144,6 +156,8 @@ export default function CashierDashboard() {
   const [bankAccounts, setBankAccounts] = useState<BankAccountOption[]>([]);
   const [currencies, setCurrencies] = useState<CurrencyOption[]>([]);
   const [selectedCurrencyId, setSelectedCurrencyId] = useState("");
+  const [chips, setChips] = useState<ChipOption[]>([]);
+  const [chipQuantities, setChipQuantities] = useState<Record<string, number>>({});
 
   // Tips collection state
   const [tables, setTables] = useState<TableOption[]>([]);
@@ -178,6 +192,7 @@ export default function CashierDashboard() {
   useEffect(() => {
     fetch("/api/bank-accounts").then(r => r.json()).then(setBankAccounts).catch(() => {});
     fetch("/api/tables").then(r => r.json()).then((data: TableOption[]) => setTables(data)).catch(() => {});
+    fetch("/api/chips").then(r => r.json()).then((data: ChipOption[]) => setChips(data)).catch(() => {});
     fetch("/api/currencies").then(r => r.json()).then((data: CurrencyOption[]) => {
       setCurrencies(data);
       const base = data.find(c => c.isBase);
@@ -211,6 +226,23 @@ export default function CashierDashboard() {
     fetch("/api/transactions/reports").then(r => r.json()).then(setDayReport).catch(() => {});
   }, [selectedPlayer]);
 
+  // Chip breakdown helpers
+  const showChipBreakdown = (activeAction === "BUY_IN" || activeAction === "CASH_OUT") && chips.length > 0;
+  const chipTotal = chips.reduce((sum, c) => sum + c.denomination * (chipQuantities[c.id] || 0), 0);
+  const hasChipEntries = Object.values(chipQuantities).some(q => q > 0);
+
+  function setChipQty(chipId: string, qty: number) {
+    const newQuantities = { ...chipQuantities, [chipId]: Math.max(0, qty) };
+    setChipQuantities(newQuantities);
+    // Auto-fill amount from chip total
+    const total = chips.reduce((sum, c) => sum + c.denomination * (newQuantities[c.id] || 0), 0);
+    if (total > 0) {
+      setAmount(total.toString());
+    } else {
+      setAmount("");
+    }
+  }
+
   async function submitTransaction() {
     if (!selectedPlayer || !activeAction || !amount) return;
     setSubmitting(true);
@@ -227,6 +259,13 @@ export default function CashierDashboard() {
           paymentMethod,
           bankAccountId: paymentMethod === "BANK" ? bankAccountId : null,
           currencyId: selectedCurr && !selectedCurr.isBase ? selectedCurr.id : undefined,
+          chipBreakdown: hasChipEntries ? chips.filter(c => (chipQuantities[c.id] || 0) > 0).map(c => ({
+            chipId: c.id,
+            denomination: c.denomination,
+            color: c.color,
+            quantity: chipQuantities[c.id],
+            subtotal: c.denomination * chipQuantities[c.id],
+          })) : null,
         }),
       });
       if (res.ok) {
@@ -239,6 +278,7 @@ export default function CashierDashboard() {
         setNotes("");
         setPaymentMethod("CASH");
         setBankAccountId("");
+        setChipQuantities({});
         const base = currencies.find(c => c.isBase);
         if (base) setSelectedCurrencyId(base.id);
         refreshPlayer();
@@ -510,7 +550,7 @@ export default function CashierDashboard() {
                 return (
                   <button
                     key={type}
-                    onClick={() => { setActiveAction(isActive ? null : type); setAmount(""); setNotes(""); setPaymentMethod("CASH"); setBankAccountId(""); const base = currencies.find(c => c.isBase); if (base) setSelectedCurrencyId(base.id); }}
+                    onClick={() => { setActiveAction(isActive ? null : type); setAmount(""); setNotes(""); setPaymentMethod("CASH"); setBankAccountId(""); setChipQuantities({}); const base = currencies.find(c => c.isBase); if (base) setSelectedCurrencyId(base.id); }}
                     className="rounded-lg border px-4 py-3 text-sm font-semibold tracking-wider uppercase cursor-pointer transition-all duration-200"
                     style={{
                       borderColor: isActive ? meta.color : meta.borderColor,
@@ -529,6 +569,91 @@ export default function CashierDashboard() {
             {/* Transaction Form */}
             {activeAction && (
               <div className="mt-4 pt-4 border-t border-card-border" style={{ animation: "floatUp 0.2s ease-out" }}>
+                {/* Chip Breakdown Table */}
+                {showChipBreakdown && (
+                  <div className="mb-4 rounded-lg border border-card-border overflow-hidden" style={{ animation: "floatUp 0.2s ease-out" }}>
+                    <div className="px-4 py-2 border-b border-card-border/60 flex items-center justify-between">
+                      <span className="text-[10px] font-semibold tracking-wider uppercase text-muted">
+                        {activeAction === "BUY_IN" ? "Chips Given" : "Chips Received"}
+                      </span>
+                      {hasChipEntries && (
+                        <button
+                          type="button"
+                          onClick={() => { setChipQuantities({}); setAmount(""); }}
+                          className="text-[10px] font-medium tracking-wider uppercase text-muted hover:text-foreground transition-colors cursor-pointer"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-card-border/40">
+                          <th className="text-left px-4 py-1.5 text-[10px] font-semibold tracking-wider uppercase text-muted">Chip</th>
+                          <th className="text-right px-4 py-1.5 text-[10px] font-semibold tracking-wider uppercase text-muted">Denomination</th>
+                          <th className="text-center px-4 py-1.5 text-[10px] font-semibold tracking-wider uppercase text-muted w-24">Qty</th>
+                          <th className="text-right px-4 py-1.5 text-[10px] font-semibold tracking-wider uppercase text-muted">Subtotal</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {chips.map(chip => {
+                          const qty = chipQuantities[chip.id] || 0;
+                          const subtotal = chip.denomination * qty;
+                          return (
+                            <tr key={chip.id} className="border-b border-card-border/30 hover:bg-card-border/10 transition-colors">
+                              <td className="px-4 py-1.5">
+                                <div className="flex items-center gap-2">
+                                  <div
+                                    className="w-6 h-6 rounded-full flex items-center justify-center text-[8px] font-bold"
+                                    style={{
+                                      backgroundColor: CHIP_COLOR_HEX[chip.color || ""] || "#6b7c74",
+                                      border: "1.5px solid rgba(255,255,255,0.2)",
+                                      color: chip.color === "white" || chip.color === "yellow" ? "#1a1a1a" : "#fff",
+                                    }}
+                                  >
+                                    {chip.denomination}
+                                  </div>
+                                  <span className="text-xs text-muted capitalize">{chip.color || "—"}</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-1.5 text-right font-medium" style={{ color: "var(--accent-gold-dim)" }}>
+                                {formatMoney(chip.denomination)}
+                              </td>
+                              <td className="px-4 py-1.5 text-center">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step={1}
+                                  value={qty || ""}
+                                  onChange={e => setChipQty(chip.id, parseInt(e.target.value) || 0)}
+                                  placeholder="0"
+                                  className="w-20 mx-auto rounded border border-card-border bg-transparent px-2 py-1 text-sm text-center outline-none focus:border-accent-gold/50"
+                                  style={{ color: "var(--foreground)" }}
+                                />
+                              </td>
+                              <td className="px-4 py-1.5 text-right font-medium" style={{ color: subtotal > 0 ? "var(--felt-green-light)" : "var(--muted)" }}>
+                                {subtotal > 0 ? formatMoney(subtotal) : "—"}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      {hasChipEntries && (
+                        <tfoot>
+                          <tr className="border-t border-card-border">
+                            <td colSpan={2} className="px-4 py-2 text-right text-xs font-semibold tracking-wider uppercase text-muted">Total</td>
+                            <td className="px-4 py-2 text-center text-xs font-bold" style={{ color: "var(--foreground)" }}>
+                              {Object.values(chipQuantities).reduce((s, q) => s + (q || 0), 0)}
+                            </td>
+                            <td className="px-4 py-2 text-right text-sm font-bold" style={{ color: "var(--accent-gold)" }}>
+                              {formatMoney(chipTotal)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      )}
+                    </table>
+                  </div>
+                )}
                 <div className="flex gap-3 items-end flex-wrap">
                   <div className="flex-1 min-w-[120px]">
                     <label className="block text-xs text-muted mb-1">Amount</label>
@@ -537,11 +662,12 @@ export default function CashierDashboard() {
                       min={0.01}
                       step="0.01"
                       value={amount}
-                      onChange={e => setAmount(e.target.value)}
+                      onChange={e => { if (!hasChipEntries) setAmount(e.target.value); }}
+                      readOnly={hasChipEntries}
                       placeholder="0.00"
                       className="w-full rounded-lg border border-card-border bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent-gold/50"
-                      style={{ color: "var(--foreground)" }}
-                      autoFocus
+                      style={{ color: hasChipEntries ? "var(--accent-gold)" : "var(--foreground)", opacity: hasChipEntries ? 0.8 : 1 }}
+                      autoFocus={!showChipBreakdown}
                     />
                   </div>
                   {currencies.length > 1 && (

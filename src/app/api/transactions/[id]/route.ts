@@ -12,7 +12,7 @@ export async function PUT(
 
   const { id } = await params;
   const body = await req.json();
-  const { amount, type, paymentMethod, bankAccountId, notes, currencyId } = body;
+  const { amount, type, paymentMethod, bankAccountId, notes, currencyId, chipBreakdown } = body;
 
   // Load original transaction
   const original = await prisma.transaction.findUnique({ where: { id } });
@@ -144,6 +144,7 @@ export async function PUT(
       paymentMethod: newPaymentMethod === "BANK" ? "BANK" : "CASH",
       bankAccountId: newBankAccountId,
       notes: notes !== undefined ? (notes || null) : original.notes,
+      ...(chipBreakdown !== undefined ? { chipBreakdown: chipBreakdown && Array.isArray(chipBreakdown) && chipBreakdown.length > 0 ? chipBreakdown : null } : {}),
     },
     include: {
       player: { select: { id: true, firstName: true, lastName: true } },

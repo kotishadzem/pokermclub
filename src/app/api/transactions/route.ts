@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   const { error, session } = await requireRole(["ADMIN", "CASHIER"]);
   if (error) return error;
 
-  const { playerId, type, amount, notes, paymentMethod, bankAccountId, currencyId } = await req.json();
+  const { playerId, type, amount, notes, paymentMethod, bankAccountId, currencyId, chipBreakdown } = await req.json();
   if (!playerId || !type || amount === undefined) {
     return NextResponse.json({ error: "playerId, type, and amount required" }, { status: 400 });
   }
@@ -73,6 +73,14 @@ export async function POST(req: NextRequest) {
     currencyCode = curr.code;
     exchangeRate = curr.exchangeRate;
     resolvedCurrencyId = curr.id;
+  }
+
+  // Validate chip breakdown total matches amount
+  if (chipBreakdown && Array.isArray(chipBreakdown) && chipBreakdown.length > 0) {
+    const chipTotal = chipBreakdown.reduce((sum: number, c: { denomination: number; quantity: number }) => sum + c.denomination * c.quantity, 0);
+    if (Math.abs(chipTotal - amount) > 0.01) {
+      return NextResponse.json({ error: `Chip total (${chipTotal}) does not match amount (${amount})` }, { status: 400 });
+    }
   }
 
   const amountInGel = amount * exchangeRate;
@@ -149,6 +157,7 @@ export async function POST(req: NextRequest) {
       currencyCode,
       exchangeRate,
       amountInGel,
+      chipBreakdown: chipBreakdown && Array.isArray(chipBreakdown) && chipBreakdown.length > 0 ? chipBreakdown : undefined,
       userId: (session!.user as { id: string }).id,
     },
     include: {
