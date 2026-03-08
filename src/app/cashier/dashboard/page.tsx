@@ -71,6 +71,8 @@ interface TxRecord {
   id: string;
   type: string;
   amount: number;
+  amountInGel: number | null;
+  currencyCode: string;
   notes: string | null;
   createdAt: string;
   user?: { name: string };
@@ -229,7 +231,9 @@ export default function CashierDashboard() {
       });
       if (res.ok) {
         const meta = ACTION_META[activeAction];
-        setToast({ message: `${meta.label} of ${formatMoney(parseFloat(amount))} recorded`, type: "success" });
+        const gelAmt = selectedCurr && !selectedCurr.isBase ? parseFloat(amount) * selectedCurr.exchangeRate : parseFloat(amount);
+        const currLabel = selectedCurr && !selectedCurr.isBase ? ` (${selectedCurr.code} ${parseFloat(amount).toFixed(2)})` : "";
+        setToast({ message: `${meta.label} of ${formatMoney(gelAmt)}${currLabel} recorded`, type: "success" });
         setActiveAction(null);
         setAmount("");
         setNotes("");
@@ -308,8 +312,9 @@ export default function CashierDashboard() {
   // Calculate balance from transactions
   function calcBalance(txs: TxRecord[]): number {
     return txs.reduce((bal, t) => {
-      if (t.type === "BUY_IN" || t.type === "DEPOSIT") return bal + t.amount;
-      return bal - t.amount;
+      const gelAmt = t.amountInGel ?? t.amount;
+      if (t.type === "BUY_IN" || t.type === "DEPOSIT") return bal + gelAmt;
+      return bal - gelAmt;
     }, 0);
   }
 
@@ -652,8 +657,11 @@ export default function CashierDashboard() {
                   </div>
                   <div className="text-right">
                     <span className="text-sm font-bold" style={{ color: typeColor(tx.type) }}>
-                      {tx.type === "CASH_OUT" || tx.type === "WITHDRAWAL" || tx.type === "RAKEBACK_PAYOUT" ? "-" : "+"}{formatMoney(tx.amount)}
+                      {tx.type === "CASH_OUT" || tx.type === "WITHDRAWAL" || tx.type === "RAKEBACK_PAYOUT" ? "-" : "+"}{formatMoney(tx.amountInGel ?? tx.amount)}
                     </span>
+                    {tx.currencyCode !== "GEL" && (
+                      <span className="block text-[10px] text-muted">{tx.currencyCode} {tx.amount.toFixed(2)}</span>
+                    )}
                     <p className="text-[10px] text-muted">
                       {new Date(tx.createdAt).toLocaleString()}
                     </p>
