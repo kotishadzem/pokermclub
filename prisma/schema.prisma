@@ -30,6 +30,7 @@ model User {
   transactions    Transaction[]
   openingBalances OpeningBalance[]
   tipCollections  TipCollection[]
+  rakeCollections RakeCollection[]
   roomVisits      RoomVisit[]
 }
 
@@ -98,7 +99,8 @@ model Table {
 
   sessions       TableSession[]
   waitingList    WaitingList[]
-  tipCollections TipCollection[]
+  tipCollections  TipCollection[]
+  rakeCollections RakeCollection[]
 }
 
 // ── Table Sessions & Seats ──
@@ -203,6 +205,18 @@ model TipCollection {
   createdAt DateTime @default(now())
 }
 
+// ── Rake Collections (cashier collects rake from table) ──
+model RakeCollection {
+  id        String   @id @default(cuid())
+  tableId   String
+  table     Table    @relation(fields: [tableId], references: [id])
+  amount    Float
+  notes     String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
+
 // ── Rake Tracking ──
 model RakeRecord {
   id             String       @id @default(cuid())
@@ -214,6 +228,13 @@ model RakeRecord {
   rakeAmount     Float
   tipAmount      Float        @default(0)
   createdAt      DateTime     @default(now())
+}
+
+// ── Settings (key-value) ──
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }
 
 // ── Room Visits (Registrator) ──

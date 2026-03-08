@@ -25,6 +25,23 @@ interface TipsReport {
   collections: TipCollectionRecord[];
 }
 
+interface RakeCollectionRecord {
+  id: string;
+  tableId: string;
+  amount: number;
+  notes: string | null;
+  createdAt: string;
+  table: { id: string; name: string };
+  user: { name: string };
+}
+
+interface RakeReport {
+  date: string;
+  grandTotal: number;
+  byTable: { tableId: string; tableName: string; total: number; count: number }[];
+  collections: RakeCollectionRecord[];
+}
+
 interface BankAccountOption {
   id: string;
   name: string;
@@ -121,14 +138,23 @@ export default function CashierDashboard() {
   const [tipNotes, setTipNotes] = useState("");
   const [submittingTip, setSubmittingTip] = useState(false);
 
+  // Rake collection state
+  const [rakeReport, setRakeReport] = useState<RakeReport | null>(null);
+  const [rakeTableId, setRakeTableId] = useState("");
+  const [rakeAmount, setRakeAmount] = useState("");
+  const [rakeNotes, setRakeNotes] = useState("");
+  const [submittingRake, setSubmittingRake] = useState(false);
+
   // Fetch today's summary + tips (live-polled)
   const fetchReport = useCallback(async () => {
-    const [reportRes, tipsRes] = await Promise.all([
+    const [reportRes, tipsRes, rakeRes] = await Promise.all([
       fetch("/api/transactions/reports"),
       fetch("/api/tips"),
+      fetch("/api/rake-collections"),
     ]);
     setDayReport(await reportRes.json());
     setTipsReport(await tipsRes.json());
+    setRakeReport(await rakeRes.json());
   }, []);
 
   useLiveData(fetchReport, 5000);
@@ -229,6 +255,34 @@ export default function CashierDashboard() {
     setSubmittingTip(false);
   }
 
+  async function submitRake() {
+    if (!rakeTableId || !rakeAmount) return;
+    setSubmittingRake(true);
+    try {
+      const res = await fetch("/api/rake-collections", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tableId: rakeTableId,
+          amount: parseFloat(rakeAmount),
+          notes: rakeNotes || null,
+        }),
+      });
+      if (res.ok) {
+        setToast({ message: `Rake of $${parseFloat(rakeAmount).toFixed(2)} collected`, type: "success" });
+        setRakeAmount("");
+        setRakeNotes("");
+        fetch("/api/rake-collections").then(r => r.json()).then(setRakeReport).catch(() => {});
+      } else {
+        const err = await res.json();
+        setToast({ message: err.error || "Rake collection failed", type: "error" });
+      }
+    } catch {
+      setToast({ message: "Rake collection failed", type: "error" });
+    }
+    setSubmittingRake(false);
+  }
+
   // Calculate balance from transactions
   function calcBalance(txs: TxRecord[]): number {
     return txs.reduce((bal, t) => {
@@ -323,16 +377,16 @@ export default function CashierDashboard() {
             ))}
           </div>
           <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3">
+            <div className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3" style={{ borderColor: "rgba(201, 168, 76, 0.2)" }}>
               <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Rake Collected</p>
-              <p className="text-lg font-bold" style={{ color: "var(--accent-gold-dim)" }}>${summary?.totalRake.toFixed(2)}</p>
+              <p className="text-lg font-bold" style={{ color: "var(--accent-gold-dim)" }}>${(rakeReport?.grandTotal ?? summary?.totalRake ?? 0).toFixed(2)}</p>
             </div>
             <div className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3" style={{ borderColor: "rgba(201, 168, 76, 0.3)" }}>
               <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Tips Collected</p>
               <p className="text-lg font-bold" style={{ color: "var(--accent-gold)" }}>${summary?.totalTipsCollected?.toFixed(2) ?? "0.00"}</p>
             </div>
             {(() => {
-              const totalBalance = totalNet + (tipsReport?.grandTotal ?? 0);
+              const totalBalance = totalNet + (tipsReport?.grandTotal ?? 0) + (rakeReport?.grandTotal ?? 0);
               return (
                 <div
                   className="rounded-xl border px-4 py-3"
@@ -562,12 +616,66 @@ export default function CashierDashboard() {
         </div>
       )}
 
-      {/* ── Tip Collections Section ── */}
-      <div className="mt-6" style={{ animation: "floatUp 0.4s ease-out" }}>
-        <div className="rounded-xl border border-card-border bg-card-bg/60 p-5 mb-4">
+      {/* ── Collect Rake & Tips Section ── */}
+      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4" style={{ animation: "floatUp 0.4s ease-out" }}>
+        {/* Collect Rake */}
+        <div className="rounded-xl border border-card-border bg-card-bg/60 p-5">
+          <h3 className="text-xs font-semibold tracking-wider uppercase text-muted mb-3">Collect Rake</h3>
+          <div className="flex flex-col gap-3">
+            <div>
+              <label className="block text-xs text-muted mb-1">Table</label>
+              <select
+                value={rakeTableId}
+                onChange={e => setRakeTableId(e.target.value)}
+                className="w-full rounded-lg border border-card-border bg-card-bg px-3 py-2.5 text-sm outline-none cursor-pointer"
+                style={{ color: "var(--foreground)" }}
+              >
+                <option value="">Select table...</option>
+                {tables.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-muted mb-1">Amount ($)</label>
+              <input
+                type="number"
+                min={0.01}
+                step="0.01"
+                value={rakeAmount}
+                onChange={e => setRakeAmount(e.target.value)}
+                placeholder="0.00"
+                className="w-full rounded-lg border border-card-border bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent-gold/50"
+                style={{ color: "var(--foreground)" }}
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-muted mb-1">Notes (optional)</label>
+              <input
+                type="text"
+                value={rakeNotes}
+                onChange={e => setRakeNotes(e.target.value)}
+                placeholder="Optional notes..."
+                className="w-full rounded-lg border border-card-border bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent-gold/50"
+                style={{ color: "var(--foreground)" }}
+              />
+            </div>
+            <button
+              onClick={submitRake}
+              disabled={!rakeTableId || !rakeAmount || parseFloat(rakeAmount) <= 0 || submittingRake}
+              className="rounded-lg px-6 py-2.5 text-sm font-semibold tracking-wider uppercase cursor-pointer disabled:opacity-30 transition-opacity"
+              style={{ background: "linear-gradient(135deg, var(--felt-green), var(--felt-green-light))", color: "var(--foreground)" }}
+            >
+              {submittingRake ? "..." : "Collect"}
+            </button>
+          </div>
+        </div>
+
+        {/* Collect Tips */}
+        <div className="rounded-xl border border-card-border bg-card-bg/60 p-5">
           <h3 className="text-xs font-semibold tracking-wider uppercase text-muted mb-3">Collect Tips</h3>
-          <div className="flex gap-3 items-end flex-wrap">
-            <div className="flex-1 min-w-[140px]">
+          <div className="flex flex-col gap-3">
+            <div>
               <label className="block text-xs text-muted mb-1">Table</label>
               <select
                 value={tipTableId}
@@ -581,7 +689,7 @@ export default function CashierDashboard() {
                 ))}
               </select>
             </div>
-            <div className="flex-1 min-w-[120px]">
+            <div>
               <label className="block text-xs text-muted mb-1">Amount ($)</label>
               <input
                 type="number"
@@ -594,7 +702,7 @@ export default function CashierDashboard() {
                 style={{ color: "var(--foreground)" }}
               />
             </div>
-            <div className="flex-1 min-w-[120px]">
+            <div>
               <label className="block text-xs text-muted mb-1">Notes (optional)</label>
               <input
                 type="text"
@@ -615,7 +723,6 @@ export default function CashierDashboard() {
             </button>
           </div>
         </div>
-
       </div>
 
       {/* Empty state */}

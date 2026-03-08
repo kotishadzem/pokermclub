@@ -116,11 +116,12 @@ export async function GET(req: NextRequest) {
     depositChannel,
   ];
 
-  // Rake collected today
-  const rakeRecords = await prisma.rakeRecord.findMany({
+  // Rake collected today (from cashier rake collections)
+  const rakeCollections = await prisma.rakeCollection.aggregate({
     where: { createdAt: { gte: dayStart, lte: dayEnd } },
+    _sum: { amount: true },
   });
-  const totalRake = rakeRecords.reduce((sum, r) => sum + r.rakeAmount, 0);
+  const totalRake = rakeCollections._sum.amount || 0;
 
   // Tips collected today (physical cash received by cashier from dealers)
   const tipCollections = await prisma.tipCollection.aggregate({
