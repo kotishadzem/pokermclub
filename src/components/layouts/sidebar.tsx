@@ -36,6 +36,7 @@ const NAV_CONFIG: Record<string, NavItem[]> = {
     { label: "Transactions", href: "/cashier/transactions", icon: "⇄" },
     { label: "Reports", href: "/cashier/reports", icon: "▤" },
     { label: "Players", href: "/players/list", icon: "♟" },
+    { label: "Opening Balances", href: "/cashier/opening-balances", icon: "◎" },
     { label: "Currencies", href: "/cashier/currencies", icon: "💱" },
   ],
   DEALER: [

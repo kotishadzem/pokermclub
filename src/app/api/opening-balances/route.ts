@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const { error, session } = await requireRole(["ADMIN"]);
+  const { error, session } = await requireRole(["ADMIN", "CASHIER"]);
   if (error) return error;
 
   const { date, time, balances } = await req.json() as {
