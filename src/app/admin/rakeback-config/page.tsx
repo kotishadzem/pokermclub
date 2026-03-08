@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useCurrency } from "@/lib/currency";
 
 interface RakebackEntry {
   player: { id: string; firstName: string; lastName: string; rakebackPercent: number };
@@ -27,6 +28,7 @@ function Toast({ message, type, onClose }: { message: string; type: "success" | 
 }
 
 export default function RakebackConfigPage() {
+  const { formatMoney } = useCurrency();
   const [entries, setEntries] = useState<RakebackEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -102,11 +104,11 @@ export default function RakebackConfigPage() {
         </div>
         <div className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3">
           <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Total Earned</p>
-          <p className="text-lg font-bold" style={{ color: "var(--felt-green-light)" }}>${totalEarned.toFixed(2)}</p>
+          <p className="text-lg font-bold" style={{ color: "var(--felt-green-light)" }}>{formatMoney(totalEarned)}</p>
         </div>
         <div className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3">
           <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Outstanding Balance</p>
-          <p className="text-lg font-bold" style={{ color: "var(--accent-gold-dim)" }}>${totalBalance.toFixed(2)}</p>
+          <p className="text-lg font-bold" style={{ color: "var(--accent-gold-dim)" }}>{formatMoney(totalBalance)}</p>
         </div>
       </div>
 
@@ -189,11 +191,11 @@ export default function RakebackConfigPage() {
                       <span className="text-accent-gold">{e.player.rakebackPercent}%</span>
                     )}
                   </td>
-                  <td className="px-5 py-3 text-right text-muted">${e.totalRakeContributed.toFixed(2)}</td>
-                  <td className="px-5 py-3 text-right" style={{ color: "var(--felt-green-light)" }}>${e.rakebackEarned.toFixed(2)}</td>
-                  <td className="px-5 py-3 text-right text-muted">${e.totalPaidOut.toFixed(2)}</td>
+                  <td className="px-5 py-3 text-right text-muted">{formatMoney(e.totalRakeContributed)}</td>
+                  <td className="px-5 py-3 text-right" style={{ color: "var(--felt-green-light)" }}>{formatMoney(e.rakebackEarned)}</td>
+                  <td className="px-5 py-3 text-right text-muted">{formatMoney(e.totalPaidOut)}</td>
                   <td className="px-5 py-3 text-right font-bold" style={{ color: e.rakebackBalance > 0 ? "var(--accent-gold)" : "var(--muted)" }}>
-                    ${e.rakebackBalance.toFixed(2)}
+                    {formatMoney(e.rakebackBalance)}
                   </td>
                   <td className="px-5 py-3 text-right">
                     <button

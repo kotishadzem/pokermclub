@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useLiveData } from "@/lib/use-live-data";
+import { useCurrency } from "@/lib/currency";
 
 interface TableOption {
   id: string;
@@ -117,6 +118,7 @@ function Toast({ message, type, onClose }: { message: string; type: "success" | 
 }
 
 export default function CashierDashboard() {
+  const { formatMoney, currency } = useCurrency();
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<PlayerOption[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerDetail | null>(null);
@@ -209,7 +211,7 @@ export default function CashierDashboard() {
       });
       if (res.ok) {
         const meta = ACTION_META[activeAction];
-        setToast({ message: `${meta.label} of $${parseFloat(amount).toFixed(2)} recorded`, type: "success" });
+        setToast({ message: `${meta.label} of ${formatMoney(parseFloat(amount))} recorded`, type: "success" });
         setActiveAction(null);
         setAmount("");
         setNotes("");
@@ -240,7 +242,7 @@ export default function CashierDashboard() {
         }),
       });
       if (res.ok) {
-        setToast({ message: `Tip of $${parseFloat(tipAmount).toFixed(2)} collected`, type: "success" });
+        setToast({ message: `Tip of ${formatMoney(parseFloat(tipAmount))} collected`, type: "success" });
         setTipAmount("");
         setTipNotes("");
         // Refresh tips report
@@ -269,7 +271,7 @@ export default function CashierDashboard() {
         }),
       });
       if (res.ok) {
-        setToast({ message: `Rake of $${parseFloat(rakeAmount).toFixed(2)} collected`, type: "success" });
+        setToast({ message: `Rake of ${formatMoney(parseFloat(rakeAmount))} collected`, type: "success" });
         setRakeAmount("");
         setRakeNotes("");
         fetch("/api/rake-collections").then(r => r.json()).then(setRakeReport).catch(() => {});
@@ -356,20 +358,20 @@ export default function CashierDashboard() {
                 <div className="grid grid-cols-4 divide-x divide-card-border/40">
                   <div className="px-3 py-2.5 text-center">
                     <p className="text-[9px] font-semibold tracking-widest uppercase text-muted mb-0.5">OPENING</p>
-                    <p className="text-sm font-bold" style={{ color: "var(--accent-gold-dim)" }}>${ch.opening.toFixed(2)}</p>
+                    <p className="text-sm font-bold" style={{ color: "var(--accent-gold-dim)" }}>{formatMoney(ch.opening)}</p>
                   </div>
                   <div className="px-3 py-2.5 text-center">
                     <p className="text-[9px] font-semibold tracking-widest uppercase text-muted mb-0.5">IN</p>
-                    <p className="text-sm font-bold" style={{ color: "var(--felt-green-light)" }}>${ch.in.toFixed(2)}</p>
+                    <p className="text-sm font-bold" style={{ color: "var(--felt-green-light)" }}>{formatMoney(ch.in)}</p>
                   </div>
                   <div className="px-3 py-2.5 text-center">
                     <p className="text-[9px] font-semibold tracking-widest uppercase text-muted mb-0.5">OUT</p>
-                    <p className="text-sm font-bold" style={{ color: "var(--danger)" }}>${ch.out.toFixed(2)}</p>
+                    <p className="text-sm font-bold" style={{ color: "var(--danger)" }}>{formatMoney(ch.out)}</p>
                   </div>
                   <div className="px-3 py-2.5 text-center" style={{ backgroundColor: ch.balance >= 0 ? "rgba(13, 74, 46, 0.08)" : "rgba(199, 69, 69, 0.05)" }}>
                     <p className="text-[9px] font-semibold tracking-widest uppercase text-muted mb-0.5">BALANCE</p>
                     <p className="text-sm font-bold" style={{ color: ch.balance >= 0 ? "var(--felt-green-light)" : "var(--danger)" }}>
-                      ${ch.balance.toFixed(2)}
+                      {formatMoney(ch.balance)}
                     </p>
                   </div>
                 </div>
@@ -379,11 +381,11 @@ export default function CashierDashboard() {
           <div className="grid grid-cols-3 gap-3">
             <div className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3" style={{ borderColor: "rgba(201, 168, 76, 0.2)" }}>
               <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Rake Collected</p>
-              <p className="text-lg font-bold" style={{ color: "var(--accent-gold-dim)" }}>${(rakeReport?.grandTotal ?? summary?.totalRake ?? 0).toFixed(2)}</p>
+              <p className="text-lg font-bold" style={{ color: "var(--accent-gold-dim)" }}>{formatMoney(rakeReport?.grandTotal ?? summary?.totalRake ?? 0)}</p>
             </div>
             <div className="rounded-xl border border-card-border bg-card-bg/60 px-4 py-3" style={{ borderColor: "rgba(201, 168, 76, 0.3)" }}>
               <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Tips Collected</p>
-              <p className="text-lg font-bold" style={{ color: "var(--accent-gold)" }}>${summary?.totalTipsCollected?.toFixed(2) ?? "0.00"}</p>
+              <p className="text-lg font-bold" style={{ color: "var(--accent-gold)" }}>{formatMoney(summary?.totalTipsCollected ?? 0)}</p>
             </div>
             {(() => {
               const totalBalance = totalNet + (tipsReport?.grandTotal ?? 0) + (rakeReport?.grandTotal ?? 0);
@@ -397,7 +399,7 @@ export default function CashierDashboard() {
                 >
                   <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Total Balance</p>
                   <p className="text-lg font-bold" style={{ color: totalBalance >= 0 ? "var(--felt-green-light)" : "var(--danger)" }}>
-                    {totalBalance >= 0 ? "+" : "-"}${Math.abs(totalBalance).toFixed(2)}
+                    {totalBalance >= 0 ? "+" : "-"}{formatMoney(Math.abs(totalBalance))}
                   </p>
                 </div>
               );
@@ -469,7 +471,7 @@ export default function CashierDashboard() {
               <div className="text-right">
                 <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1">Balance</p>
                 <p className="text-xl font-bold" style={{ color: calcBalance(selectedPlayer.transactions) >= 0 ? "var(--felt-green-light)" : "var(--danger)" }}>
-                  ${calcBalance(selectedPlayer.transactions).toFixed(2)}
+                  {formatMoney(calcBalance(selectedPlayer.transactions))}
                 </p>
               </div>
               <button onClick={() => { setSelectedPlayer(null); setActiveAction(null); }} className="text-muted hover:text-foreground cursor-pointer ml-2">✕</button>
@@ -504,7 +506,7 @@ export default function CashierDashboard() {
               <div className="mt-4 pt-4 border-t border-card-border" style={{ animation: "floatUp 0.2s ease-out" }}>
                 <div className="flex gap-3 items-end flex-wrap">
                   <div className="flex-1 min-w-[120px]">
-                    <label className="block text-xs text-muted mb-1">Amount ($)</label>
+                    <label className="block text-xs text-muted mb-1">Amount ({currency.symbol})</label>
                     <input
                       type="number"
                       min={0.01}
@@ -603,7 +605,7 @@ export default function CashierDashboard() {
                   </div>
                   <div className="text-right">
                     <span className="text-sm font-bold" style={{ color: typeColor(tx.type) }}>
-                      {tx.type === "CASH_OUT" || tx.type === "WITHDRAWAL" || tx.type === "RAKEBACK_PAYOUT" ? "-" : "+"}${tx.amount.toFixed(2)}
+                      {tx.type === "CASH_OUT" || tx.type === "WITHDRAWAL" || tx.type === "RAKEBACK_PAYOUT" ? "-" : "+"}{formatMoney(tx.amount)}
                     </span>
                     <p className="text-[10px] text-muted">
                       {new Date(tx.createdAt).toLocaleString()}
@@ -637,7 +639,7 @@ export default function CashierDashboard() {
               </select>
             </div>
             <div>
-              <label className="block text-xs text-muted mb-1">Amount ($)</label>
+              <label className="block text-xs text-muted mb-1">Amount ({currency.symbol})</label>
               <input
                 type="number"
                 min={0.01}
@@ -690,7 +692,7 @@ export default function CashierDashboard() {
               </select>
             </div>
             <div>
-              <label className="block text-xs text-muted mb-1">Amount ($)</label>
+              <label className="block text-xs text-muted mb-1">Amount ({currency.symbol})</label>
               <input
                 type="number"
                 min={0.01}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useCurrency } from "@/lib/currency";
 
 interface BankAccount {
   id: string;
@@ -38,6 +39,7 @@ function Toast({ message, type, onClose }: { message: string; type: "success" | 
 }
 
 export default function OpeningBalancesPage() {
+  const { formatMoney } = useCurrency();
   const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [time, setTime] = useState(() => {
     const now = new Date();
@@ -276,7 +278,7 @@ export default function OpeningBalancesPage() {
                 <tr key={ob.id} className="border-b border-card-border/50 hover:bg-card-border/20 transition-colors">
                   <td className="px-5 py-3 font-medium">{channelLabel(ob.channel)}</td>
                   <td className="px-5 py-3 text-right font-bold" style={{ color: "var(--accent-gold)" }}>
-                    ${ob.amount.toFixed(2)}
+                    {formatMoney(ob.amount)}
                   </td>
                   <td className="px-5 py-3 text-muted">{ob.time}</td>
                   <td className="px-5 py-3 text-muted">{ob.user.name}</td>

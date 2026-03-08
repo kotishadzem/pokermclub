@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useEffect, useState, useCallback } from "react";
 import { useLiveData } from "@/lib/use-live-data";
+import { useCurrency } from "@/lib/currency";
 
 interface TxRecord {
   id: string;
@@ -35,6 +36,7 @@ function typeColor(type: string): string {
 
 export default function AdminDashboard() {
   const { data: session } = useSession();
+  const { formatMoney } = useCurrency();
   const [data, setData] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -62,13 +64,13 @@ export default function AdminDashboard() {
     },
     {
       label: "Today's Revenue",
-      value: loading ? "..." : `$${(data?.todayRevenue ?? 0).toFixed(2)}`,
+      value: loading ? "..." : formatMoney(data?.todayRevenue ?? 0),
       icon: "◈",
       accent: "var(--felt-green)",
     },
     {
       label: "Today's Tips",
-      value: loading ? "..." : `$${(data?.todayTips ?? 0).toFixed(2)}`,
+      value: loading ? "..." : formatMoney(data?.todayTips ?? 0),
       icon: "♥",
       accent: "var(--felt-green-light)",
     },
@@ -174,7 +176,7 @@ export default function AdminDashboard() {
                   className="text-sm font-bold"
                   style={{ color: typeColor(tx.type) }}
                 >
-                  ${tx.amount.toFixed(2)}
+                  {formatMoney(tx.amount)}
                 </span>
                 <p className="text-[10px] text-muted">
                   {new Date(tx.createdAt).toLocaleString()}

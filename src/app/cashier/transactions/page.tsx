@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useCurrency } from "@/lib/currency";
 
 interface TxRecord {
   id: string;
@@ -74,6 +75,7 @@ function formatType(type: string): string {
 }
 
 export default function TransactionsPage() {
+  const { formatMoney } = useCurrency();
   const [transactions, setTransactions] = useState<TxRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState("");
@@ -182,7 +184,7 @@ export default function TransactionsPage() {
       <div className="flex items-center gap-4 mb-4 px-1">
         <span className="text-xs text-muted tracking-wider uppercase">Net total:</span>
         <span className="text-sm font-bold" style={{ color: totalShown >= 0 ? "var(--felt-green-light)" : "var(--danger)" }}>
-          {totalShown >= 0 ? "+" : ""}${totalShown.toFixed(2)}
+          {totalShown >= 0 ? "+" : ""}{formatMoney(totalShown)}
         </span>
       </div>
 
@@ -223,7 +225,7 @@ export default function TransactionsPage() {
                   </td>
                   <td className="px-5 py-3 text-right font-bold" style={{ color: typeColor(tx.type) }}>
                     {tx.type === "CASH_OUT" || tx.type === "WITHDRAWAL" || tx.type === "RAKEBACK_PAYOUT" ? "-" : "+"}
-                    ${tx.amount.toFixed(2)}
+                    {formatMoney(tx.amount)}
                   </td>
                   <td className="px-5 py-3 text-xs text-muted">
                     {tx.paymentMethod === "BANK" ? (tx.bankAccount ? `Bank - ${tx.bankAccount.name}` : "Bank") : "Cash"}
@@ -255,7 +257,7 @@ export default function TransactionsPage() {
           <div className="mb-4">
             <h2 className="text-lg font-bold tracking-wide" style={{ fontFamily: "var(--font-display)" }}>Recent Rake</h2>
             <p className="mt-1 text-sm text-muted">
-              {rakeReport.collections.length} collection{rakeReport.collections.length !== 1 ? "s" : ""} — Total: <span style={{ color: "var(--felt-green-light)" }}>${rakeReport.grandTotal.toFixed(2)}</span>
+              {rakeReport.collections.length} collection{rakeReport.collections.length !== 1 ? "s" : ""} — Total: <span style={{ color: "var(--felt-green-light)" }}>{formatMoney(rakeReport.grandTotal)}</span>
             </p>
           </div>
           <div className="rounded-xl border border-card-border bg-card-bg/60 overflow-hidden">
@@ -277,7 +279,7 @@ export default function TransactionsPage() {
                       <span className="text-[10px]">{new Date(rc.createdAt).toLocaleTimeString()}</span>
                     </td>
                     <td className="px-5 py-3 font-medium" style={{ color: "var(--felt-green-light)" }}>{rc.table.name}</td>
-                    <td className="px-5 py-3 text-right font-bold" style={{ color: "var(--felt-green-light)" }}>${rc.amount.toFixed(2)}</td>
+                    <td className="px-5 py-3 text-right font-bold" style={{ color: "var(--felt-green-light)" }}>{formatMoney(rc.amount)}</td>
                     <td className="px-5 py-3 text-muted text-xs max-w-[200px] truncate">{rc.notes || "—"}</td>
                     <td className="px-5 py-3 text-muted text-xs">{rc.user.name}</td>
                   </tr>
@@ -294,7 +296,7 @@ export default function TransactionsPage() {
           <div className="mb-4">
             <h2 className="text-lg font-bold tracking-wide" style={{ fontFamily: "var(--font-display)" }}>Recent Tips</h2>
             <p className="mt-1 text-sm text-muted">
-              {tipsReport.collections.length} tip{tipsReport.collections.length !== 1 ? "s" : ""} — Total: <span style={{ color: "var(--accent-gold)" }}>${tipsReport.grandTotal.toFixed(2)}</span>
+              {tipsReport.collections.length} tip{tipsReport.collections.length !== 1 ? "s" : ""} — Total: <span style={{ color: "var(--accent-gold)" }}>{formatMoney(tipsReport.grandTotal)}</span>
             </p>
           </div>
           <div className="rounded-xl border border-card-border bg-card-bg/60 overflow-hidden">
@@ -316,7 +318,7 @@ export default function TransactionsPage() {
                       <span className="text-[10px]">{new Date(tc.createdAt).toLocaleTimeString()}</span>
                     </td>
                     <td className="px-5 py-3 font-medium" style={{ color: "var(--accent-gold)" }}>{tc.table.name}</td>
-                    <td className="px-5 py-3 text-right font-bold" style={{ color: "var(--accent-gold)" }}>${tc.amount.toFixed(2)}</td>
+                    <td className="px-5 py-3 text-right font-bold" style={{ color: "var(--accent-gold)" }}>{formatMoney(tc.amount)}</td>
                     <td className="px-5 py-3 text-muted text-xs max-w-[200px] truncate">{tc.notes || "—"}</td>
                     <td className="px-5 py-3 text-muted text-xs">{tc.user.name}</td>
                   </tr>

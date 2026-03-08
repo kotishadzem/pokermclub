@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useCurrency } from "@/lib/currency";
 
 interface GameType { id: string; name: string; }
 interface TableData {
@@ -26,6 +27,7 @@ function Toast({ message, type, onClose }: { message: string; type: "success" | 
 }
 
 export default function TablesPage() {
+  const { currency } = useCurrency();
   const [tables, setTables] = useState<TableData[]>([]);
   const [gameTypes, setGameTypes] = useState<GameType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,7 +130,7 @@ export default function TablesPage() {
                   <td className="px-5 py-3 text-muted">{t.gameType?.name || "—"}</td>
                   <td className="px-5 py-3 text-muted">{t.seats}</td>
                   <td className="px-5 py-3 text-accent-gold-dim">{t.blindSmall}/{t.blindBig}</td>
-                  <td className="px-5 py-3 text-muted">${t.minBuyIn}–${t.maxBuyIn}</td>
+                  <td className="px-5 py-3 text-muted">{currency.symbol}{t.minBuyIn}–{currency.symbol}{t.maxBuyIn}</td>
                   <td className="px-5 py-3">
                     <button onClick={() => toggleTable(t)} className="cursor-pointer text-xs font-medium tracking-wider uppercase" style={{ color: t.status === "OPEN" ? "var(--felt-green-light)" : "var(--muted)" }}>
                       {t.status === "OPEN" ? "● Open" : "○ Closed"}

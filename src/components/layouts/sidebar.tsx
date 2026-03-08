@@ -22,6 +22,7 @@ const NAV_CONFIG: Record<string, NavItem[]> = {
     { label: "Opening Balances", href: "/admin/opening-balances", icon: "◎" },
     { label: "Rakeback", href: "/admin/rakeback-config", icon: "%" },
     { label: "Players", href: "/players/list", icon: "♟" },
+    { label: "Settings", href: "/admin/settings", icon: "⚙" },
   ],
   PITBOSS: [
     { label: "Floor Plan", href: "/pitboss/floor-plan", icon: "◫" },

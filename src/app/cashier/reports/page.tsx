@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useCurrency } from "@/lib/currency";
 
 interface TxRecord {
   id: string;
@@ -58,6 +59,7 @@ function formatType(type: string): string {
 }
 
 export default function ReportsPage() {
+  const { formatMoney } = useCurrency();
   const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [report, setReport] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -166,25 +168,25 @@ export default function ReportsPage() {
                   <div className="px-4 py-3.5 text-center">
                     <p className="text-[9px] font-semibold tracking-widest uppercase text-muted mb-1">OPENING</p>
                     <p className="text-lg font-bold" style={{ color: "var(--accent-gold-dim)" }}>
-                      ${ch.opening.toFixed(2)}
+                      {formatMoney(ch.opening)}
                     </p>
                   </div>
                   <div className="px-4 py-3.5 text-center">
                     <p className="text-[9px] font-semibold tracking-widest uppercase text-muted mb-1">IN</p>
                     <p className="text-lg font-bold" style={{ color: "var(--felt-green-light)" }}>
-                      ${ch.in.toFixed(2)}
+                      {formatMoney(ch.in)}
                     </p>
                   </div>
                   <div className="px-4 py-3.5 text-center">
                     <p className="text-[9px] font-semibold tracking-widest uppercase text-muted mb-1">OUT</p>
                     <p className="text-lg font-bold" style={{ color: "var(--danger)" }}>
-                      ${ch.out.toFixed(2)}
+                      {formatMoney(ch.out)}
                     </p>
                   </div>
                   <div className="px-4 py-3.5 text-center" style={{ backgroundColor: ch.balance >= 0 ? "rgba(13, 74, 46, 0.08)" : "rgba(199, 69, 69, 0.05)" }}>
                     <p className="text-[9px] font-semibold tracking-widest uppercase text-muted mb-1">BALANCE</p>
                     <p className="text-lg font-bold" style={{ color: ch.balance >= 0 ? "var(--felt-green-light)" : "var(--danger)" }}>
-                      ${ch.balance.toFixed(2)}
+                      {formatMoney(ch.balance)}
                     </p>
                   </div>
                 </div>
@@ -196,7 +198,7 @@ export default function ReportsPage() {
           <div className="grid grid-cols-2 gap-3 mb-6">
             <div className="rounded-xl border border-card-border bg-card-bg/60 px-5 py-4">
               <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1.5">Rake Collected</p>
-              <p className="text-2xl font-bold" style={{ color: "var(--accent-gold-dim)" }}>${s.totalRake.toFixed(2)}</p>
+              <p className="text-2xl font-bold" style={{ color: "var(--accent-gold-dim)" }}>{formatMoney(s.totalRake)}</p>
             </div>
             <div
               className="rounded-xl border px-5 py-4"
@@ -207,7 +209,7 @@ export default function ReportsPage() {
             >
               <p className="text-[10px] font-semibold tracking-wider uppercase text-muted mb-1.5">Total Balance</p>
               <p className="text-2xl font-bold" style={{ color: totalNet >= 0 ? "var(--felt-green-light)" : "var(--danger)" }}>
-                {totalNet >= 0 ? "+" : "-"}${Math.abs(totalNet).toFixed(2)}
+                {totalNet >= 0 ? "+" : "-"}{formatMoney(Math.abs(totalNet))}
               </p>
             </div>
           </div>
@@ -249,7 +251,7 @@ export default function ReportsPage() {
                       </td>
                       <td className="px-5 py-2.5 text-right font-bold" style={{ color: typeColor(tx.type) }}>
                         {tx.type === "CASH_OUT" || tx.type === "WITHDRAWAL" || tx.type === "RAKEBACK_PAYOUT" ? "-" : "+"}
-                        ${tx.amount.toFixed(2)}
+                        {formatMoney(tx.amount)}
                       </td>
                       <td className="px-5 py-2.5 text-xs text-muted">
                         {tx.paymentMethod === "BANK" ? (tx.bankAccount ? `Bank - ${tx.bankAccount.name}` : "Bank") : "Cash"}

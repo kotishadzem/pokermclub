@@ -46,6 +46,13 @@ async function main() {
     });
   }
 
+  // Default settings
+  await prisma.setting.upsert({
+    where: { key: "currency" },
+    update: {},
+    create: { key: "currency", value: "GEL" },
+  });
+
   console.log("Seed complete: admin/admin123");
 }
 
