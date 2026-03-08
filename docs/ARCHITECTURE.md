@@ -46,9 +46,11 @@ pokemclub/
 │   │   │   ├── tables/         # Table CRUD management
 │   │   │   └── waiting-list/   # Waiting list management
 │   │   ├── cashier/            # Cashier role pages
-│   │   │   ├── dashboard/      # Channel cards, Rake/Tips/Balance summary, player search, tip collection form
-│   │   │   ├── transactions/   # Transaction history + filters + Recent Tips table
+│   │   │   ├── dashboard/      # Channel cards, Rake/Tips/Balance summary, player search, chip inventory panel
+│   │   │   ├── transactions/   # Transaction history + filters + Recent Tips/Expenses tables
 │   │   │   ├── opening-balances/# Daily opening balances + daily activity (transactions, rake, tips) with edit
+│   │   │   ├── chips/          # Chip denominations directory (CRUD)
+│   │   │   ├── expense-types/  # Expense types directory (CRUD, isInternal flag)
 │   │   │   └── reports/        # Daily financial reports
 │   │   ├── dealer/             # Dealer role pages
 │   │   │   └── table/          # Assigned table + rake recording
@@ -68,6 +70,7 @@ pokemclub/
 │   │       ├── rake/           # Rake recording
 │   │       ├── rake-collections/ # Rake collections CRUD (cashier collects from table)
 │   │       ├── tips/           # Tip collections (cashier ← dealer)
+│   │       ├── chips/inventory/ # Chip inventory (cashier vs field counts)
 │   │       ├── rakeback/       # Rakeback calculation
 │   │       ├── dealer/         # Dealer's assigned table
 │   │       ├── game-types/     # Game type CRUD
@@ -152,12 +155,12 @@ pokemclub/
 - `GET /api/rake?tableSessionId=` — Get rake history for session (includes totalTips)
 
 ### Rake Collections
-- `POST /api/rake-collections` — Record rake collection. Body: `{ tableId, amount, notes? }`
+- `POST /api/rake-collections` — Record rake collection. Body: `{ tableId, amount, notes?, chipBreakdown? }`
 - `GET /api/rake-collections?date=` — Rake collections report for date (default: today). Returns `{ date, grandTotal, byTable: [{tableId, tableName, total, count}], collections: [...] }`
 - `PUT /api/rake-collections/[id]` — Edit rake collection (amount, tableId, notes). All fields optional, keeps original if omitted.
 
 ### Tips
-- `POST /api/tips` — Record tip collection (cashier receives tips from dealer). Body: `{ tableId, amount, notes? }`
+- `POST /api/tips` — Record tip collection (cashier receives tips from dealer). Body: `{ tableId, amount, notes?, chipBreakdown? }`
 - `GET /api/tips?date=` — Tips report for date (default: today). Returns `{ date, grandTotal, byTable: [{tableId, tableName, total, count}], collections: [...] }`
 - `PUT /api/tips/[id]` — Edit tip collection (amount, tableId, notes). All fields optional, keeps original if omitted.
 
@@ -170,6 +173,9 @@ pokemclub/
 ### Expenses
 - `GET /api/expenses?date=` — Today's expenses with totals. Returns `{ date, total, expenses: [...] }`
 - `POST /api/expenses` — Record expense. Body: `{ expenseTypeId, amount, paymentMethod, bankAccountId?, notes? }`. Checks channel balance before recording. Expenses reduce channel balances in daily reports.
+
+### Chip Inventory
+- `GET /api/chips/inventory` — Returns per-denomination chip counts: `{ chips: [{ chipId, denomination, color, total, cashier, field }] }`. Cashier = total - chips given out (buy-in) + chips received (cash-out, rake, tips) - chips spent (internal expenses). Field = total - cashier.
 
 ### Rakeback
 - `GET /api/rakeback?playerId=` — Calculate rakeback for player(s)
@@ -210,10 +216,12 @@ pokemclub/
 - **Transaction** — All financial operations (buy-in, cash-out, deposit, withdrawal, rakeback payout). Includes `paymentMethod` (CASH/BANK) and optional `bankAccountId` for bank transactions.
 - **OpeningBalance** — Starting balance per channel per date. Channel is `"CASH"`, `"DEPOSITS"`, or a bank account ID. Unique on `[date, channel]`. Used for balance checks on outgoing transactions and displayed on dashboard/reports.
 - **RakeRecord** — Rake and tips collected per pot per session (fields: potAmount, rakeAmount, tipAmount)
-- **TipCollection** — Physical tip cash received by cashier from dealer (fields: tableId, amount, notes, userId)
+- **TipCollection** — Physical tip cash received by cashier from dealer (fields: tableId, amount, notes, chipBreakdown, userId)
 - **RoomVisit** — Player room check-in/check-out tracking (fields: playerId, userId, checkedIn, checkedOut)
-- **ExpenseType** — Configurable expense categories (name, active flag for soft-delete)
-- **Expense** — Recorded cash outflows (expenseTypeId, amount, paymentMethod, bankAccountId, notes, userId). Reduces channel balances in daily reports.
+- **RakeCollection** — Rake cash collected by cashier from table (fields: tableId, amount, notes, chipBreakdown, userId)
+- **Chip** — Chip denominations directory (denomination, quantity, color, active). Quantity represents total inventory.
+- **ExpenseType** — Configurable expense categories (name, isInternal flag, active flag for soft-delete)
+- **Expense** — Recorded cash outflows (expenseTypeId, amount, paymentMethod, bankAccountId, notes, chipBreakdown, userId). Reduces channel balances in daily reports. Internal expenses use chip breakdown to auto-calculate amount.
 
 ### Key Relationships
 
@@ -262,6 +270,7 @@ docker compose exec app npm run seed            # Seed data
 9. **Opening Balances** ✅ — Per-channel daily opening balances (Cash, bank accounts, Deposits), balance validation on outgoing transactions, OPENING/IN/OUT/BALANCE channel cards on dashboard and reports
 10. **Tip Collections** ✅ — Cashier records physical tip cash received from dealers per table. Dashboard shows summary total (Tips Collected card alongside Rake and Total Balance). Tip collection history is displayed on the Transactions page. Reports include `totalTipsCollected`.
 11. **Registrator Role** ✅ — Room visit tracking (check-in/check-out) via modal dialogs with editable datetime pickers, player registration access, live room occupancy counter with 5s polling.
+12. **Expenses & Chip Inventory** ✅ — Expense types with isInternal flag, expense recording with chip breakdown for internal expenses, balance checking against channel balances. Chip inventory tracking: cashier vs field counts per denomination, updated by buy-in (-), cash-out (+), rake (+), tips (+), internal expenses (-). Chip breakdown inputs on rake/tip collection forms with auto-calculated amounts.
 
 ## Real-time Update System
 
